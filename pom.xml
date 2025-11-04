@@ -30,6 +30,14 @@
         <java.version>25</java.version>
     </properties>
 
+    <!--
+        BOM (Bill of Materials) is used to:
+        1. Maintain consistent versions across all LangChain4j dependencies
+        2. Simplify dependency management by defining versions in one place
+        3. Ensure compatibility between different LangChain4j modules
+        4. Make it easier to upgrade all LangChain4j dependencies at once
+        5. Prevent version conflicts between interdependent modules
+    -->
     <dependencyManagement>
         <dependencies>
             <dependency>
