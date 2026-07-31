@@ -81,8 +81,13 @@ LangChain4j is a Java framework that simplifies the development of applications 
 
 ## Getting Started
 1. Clone the repository
-2. Configure your API keys in application.properties
+2. Configure your API keys in `src/main/resources/application.properties` (or set `OPENAI_API_KEY` in your environment)
 3. Run the application using Maven: `./mvnw spring-boot:run`
+
+## Current Dependency Versions
+- Spring Boot 3.5.7
+- LangChain4j BOM 1.18.1
+- `langchain4j-open-ai` from the BOM
 
 ## Dependencies
 - Spring Boot

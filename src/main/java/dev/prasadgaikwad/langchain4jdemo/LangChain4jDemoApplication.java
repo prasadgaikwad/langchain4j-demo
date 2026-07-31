@@ -11,7 +11,7 @@ import java.util.Scanner;
 @SpringBootApplication
 public class LangChain4jDemoApplication implements CommandLineRunner {
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         SpringApplication.run(LangChain4jDemoApplication.class, args);
     }
 
