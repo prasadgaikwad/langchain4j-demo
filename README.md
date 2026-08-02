@@ -24,6 +24,23 @@ LangChain4j is a Java framework that simplifies the development of applications 
 ## Current Features
 - Simple command-line interface to interact with user input
 - Spring Boot integration
+- Conversation memory via LangChain4j AI Services (`@MemoryId`)
+- Two memory types, switchable at runtime:
+  - `message-window`: sliding-window buffer limited by message count (`app.memory.max-messages`)
+  - `token-window`: sliding window limited by token count, using the OpenAI tokenizer (`app.memory.max-tokens`)
+
+## Running the Demo
+1. Set your API key: `export OPENAI_API_KEY=...` (or configure `application.properties`)
+2. Run: `./mvnw spring-boot:run`
+3. Type a question to chat. Supported commands:
+
+```
+/help                 Show help
+/memory               Show current memory type and state
+/memory <type>        Switch memory type (message-window | token-window)
+/clear                Clear the current conversation memory
+quit                  Exit the application
+```
 
 ## Future Experiments and Features to Try
 
@@ -84,10 +101,19 @@ LangChain4j is a Java framework that simplifies the development of applications 
 2. Configure your API keys in `src/main/resources/application.properties` (or set `OPENAI_API_KEY` in your environment)
 3. Run the application using Maven: `./mvnw spring-boot:run`
 
+## Configuration
+
+| Property                  | Default       | Description                                  |
+|---------------------------|---------------|----------------------------------------------|
+| `app.cli.enabled`         | `true`        | Enable the interactive command-line chat CLI |
+| `app.chat.model-name`     | `gpt-4o-mini` | OpenAI model used for chat                   |
+| `app.memory.max-messages` | `10`          | Max messages kept by `message-window` memory |
+| `app.memory.max-tokens`   | `2000`        | Max tokens kept by `token-window` memory     |
+
 ## Current Dependency Versions
 - Spring Boot 3.5.7
 - LangChain4j BOM 1.18.1
-- `langchain4j-open-ai` from the BOM
+- `langchain4j` and `langchain4j-open-ai` from the BOM
 
 ## Dependencies
 - Spring Boot
