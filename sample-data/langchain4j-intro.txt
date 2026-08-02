@@ -1,0 +1,1 @@
+LangChain4j is a Java framework that simplifies the development of applications powered by large language models (LLMs). It provides a unified abstraction layer over different LLM providers such as OpenAI, Anthropic, and Google. The framework integrates with Spring Boot and offers building blocks for chat, embeddings, memory, RAG, and agent-based workflows.

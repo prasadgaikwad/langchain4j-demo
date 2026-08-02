@@ -36,3 +36,5 @@ build/
 .env
 
 blog/*
+
+embedding-store.json

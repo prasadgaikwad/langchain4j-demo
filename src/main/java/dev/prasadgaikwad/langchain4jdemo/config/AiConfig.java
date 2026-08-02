@@ -5,7 +5,9 @@ import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.memory.chat.TokenWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
 import dev.langchain4j.service.AiServices;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
@@ -14,6 +16,8 @@ import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.function.Function;
 
 @Configuration
 public class AiConfig {
@@ -41,6 +45,18 @@ public class AiConfig {
         return AiServices.builder(Assistant.class)
                 .chatModel(chatModel)
                 .chatMemoryProvider(chatMemoryProvider)
+                .build();
+    }
+
+    /**
+     * Factory that builds an {@link EmbeddingModel} for a given model name.
+     * Exposed as a bean so the model can be switched at runtime (see {@code SemanticSearchService}).
+     */
+    @Bean
+    public Function<String, EmbeddingModel> embeddingModelFactory() {
+        return modelName -> OpenAiEmbeddingModel.builder()
+                .apiKey(System.getenv("OPENAI_API_KEY"))
+                .modelName(modelName)
                 .build();
     }
 
