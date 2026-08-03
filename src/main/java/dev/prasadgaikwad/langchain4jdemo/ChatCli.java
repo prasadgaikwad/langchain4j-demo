@@ -7,6 +7,7 @@ import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
+import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -31,12 +32,17 @@ public class ChatCli implements CommandLineRunner {
             "text-embedding-3-small | text-embedding-3-large | text-embedding-ada-002";
 
     private final Assistant assistant;
+    private final QaService qaService;
     private final ChatMemoryRegistry chatMemoryRegistry;
     private final SemanticSearchService searchService;
     private MemoryType currentMemoryType;
 
-    public ChatCli(Assistant assistant, ChatMemoryRegistry chatMemoryRegistry, SemanticSearchService searchService) {
+    public ChatCli(Assistant assistant,
+                   QaService qaService,
+                   ChatMemoryRegistry chatMemoryRegistry,
+                   SemanticSearchService searchService) {
         this.assistant = assistant;
+        this.qaService = qaService;
         this.chatMemoryRegistry = chatMemoryRegistry;
         this.searchService = searchService;
         this.currentMemoryType = MemoryType.MESSAGE_WINDOW;
@@ -87,6 +93,7 @@ public class ChatCli implements CommandLineRunner {
             case "/clear" -> clearMemory();
             case "/index" -> index(argument);
             case "/search" -> search(argument);
+            case "/ask" -> ask(argument);
             case "/embed" -> embed(argument);
             case "/model" -> handleModelCommand(argument);
             case "/store" -> printStoreStatus();
@@ -171,6 +178,21 @@ public class ChatCli implements CommandLineRunner {
         System.out.println();
     }
 
+    private void ask(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /ask <question>");
+            return;
+        }
+        if (searchService.storeSize() == 0) {
+            System.out.println("Embedding store is empty. Index some documents first with /index <file-or-directory>.");
+            return;
+        }
+
+        String answer = qaService.ask(currentMemoryType.memoryId(CONVERSATION_ID), argument.trim());
+        System.out.println("RAG > " + answer);
+        System.out.println();
+    }
+
     private void embed(String argument) {
         if (argument == null) {
             System.out.println("Usage: /embed <text>");
@@ -242,6 +264,7 @@ public class ChatCli implements CommandLineRunner {
                   /clear                      Clear the current conversation memory
                   /index <file|directory>     Load and index documents into the embedding store
                   /search <query>             Semantic search over the indexed documents
+                  /ask <question>             Answer the question using the indexed documents (RAG)
                   /embed <text>               Embed a text and show its vector
                   /model                      Show the current embedding model
                   /model <name>               Switch embedding model (%s)
