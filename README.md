@@ -28,18 +28,36 @@ LangChain4j is a Java framework that simplifies the development of applications 
 - Two memory types, switchable at runtime:
   - `message-window`: sliding-window buffer limited by message count (`app.memory.max-messages`)
   - `token-window`: sliding window limited by token count, using the OpenAI tokenizer (`app.memory.max-tokens`)
+- Embeddings and semantic search:
+  - Index text files or directories into an `InMemoryEmbeddingStore` (persisted to JSON)
+  - Semantic search over indexed documents with relevance scores
+  - Switchable embedding models (`text-embedding-3-small`, `text-embedding-3-large`, `text-embedding-ada-002`)
 
 ## Running the Demo
 1. Set your API key: `export OPENAI_API_KEY=...` (or configure `application.properties`)
 2. Run: `./mvnw spring-boot:run`
-3. Type a question to chat. Supported commands:
+3. Type a question to chat, or use a command:
 
 ```
-/help                 Show help
-/memory               Show current memory type and state
-/memory <type>        Switch memory type (message-window | token-window)
-/clear                Clear the current conversation memory
-quit                  Exit the application
+/help                       Show help
+/memory                     Show current memory type and state
+/memory <type>              Switch memory type (message-window | token-window)
+/clear                      Clear the current conversation memory
+/index <file|directory>     Load and index documents into the embedding store
+/search <query>             Semantic search over the indexed documents
+/embed <text>               Embed a text and show its vector
+/model                      Show the current embedding model
+/model <name>               Switch embedding model
+/store                      Show embedding store stats
+/save [path]                Persist the embedding store
+quit                        Exit the application
+```
+
+Try a semantic search with the bundled sample documents:
+
+```
+/index sample-data
+/search what is a vector database?
 ```
 
 ## Future Experiments and Features to Try
@@ -103,12 +121,15 @@ quit                  Exit the application
 
 ## Configuration
 
-| Property                  | Default       | Description                                  |
-|---------------------------|---------------|----------------------------------------------|
-| `app.cli.enabled`         | `true`        | Enable the interactive command-line chat CLI |
-| `app.chat.model-name`     | `gpt-4o-mini` | OpenAI model used for chat                   |
-| `app.memory.max-messages` | `10`          | Max messages kept by `message-window` memory |
-| `app.memory.max-tokens`   | `2000`        | Max tokens kept by `token-window` memory     |
+| Property                    | Default                 | Description                                  |
+|-----------------------------|-------------------------|----------------------------------------------|
+| `app.cli.enabled`           | `true`                  | Enable the interactive command-line chat CLI |
+| `app.chat.model-name`       | `gpt-4o-mini`           | OpenAI model used for chat                   |
+| `app.memory.max-messages`   | `10`                    | Max messages kept by `message-window` memory |
+| `app.memory.max-tokens`     | `2000`                  | Max tokens kept by `token-window` memory     |
+| `app.embedding.model-name`  | `text-embedding-3-small` | Embedding model used for indexing/search     |
+| `app.embedding.store-path`  | `embedding-store.json`  | JSON file for persisting the embedding store |
+| `app.embedding.max-results` | `5`                     | Default number of search results             |
 
 ## Current Dependency Versions
 - Spring Boot 3.5.7
