@@ -9,10 +9,16 @@ import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
+import dev.langchain4j.rag.DefaultRetrievalAugmentor;
+import dev.langchain4j.rag.RetrievalAugmentor;
+import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.service.AiServices;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
+import dev.prasadgaikwad.langchain4jdemo.ai.QaAssistant;
+import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
+import dev.prasadgaikwad.langchain4jdemo.rag.SemanticSearchContentRetriever;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,15 +42,48 @@ public class AiConfig {
                                @Value("${app.chat.model-name:gpt-4o-mini}") String modelName,
                                @Value("${app.memory.max-messages:10}") int maxMessages,
                                @Value("${app.memory.max-tokens:2000}") int maxTokens) {
-        ChatMemoryProvider chatMemoryProvider = memoryId -> {
-            ChatMemory chatMemory = createMemory((String) memoryId, modelName, maxMessages, maxTokens);
-            chatMemoryRegistry.register((String) memoryId, chatMemory);
-            return chatMemory;
-        };
-
         return AiServices.builder(Assistant.class)
                 .chatModel(chatModel)
-                .chatMemoryProvider(chatMemoryProvider)
+                .chatMemoryProvider(createChatMemoryProvider(chatMemoryRegistry, modelName, maxMessages, maxTokens))
+                .build();
+    }
+
+    /**
+     * Retrieves the most relevant document chunks for a question from the embedding
+     * store. This is the retrieval stage of the RAG pipeline.
+     */
+    @Bean
+    public ContentRetriever contentRetriever(SemanticSearchService searchService,
+                                             @Value("${app.rag.max-results:5}") int maxResults) {
+        return new SemanticSearchContentRetriever(searchService, maxResults);
+    }
+
+    /**
+     * Composes the RAG pipeline: query transform, retrieval, aggregation, and
+     * injection of the retrieved content into the user message.
+     */
+    @Bean
+    public RetrievalAugmentor retrievalAugmentor(ContentRetriever contentRetriever) {
+        return DefaultRetrievalAugmentor.builder()
+                .contentRetriever(contentRetriever)
+                .build();
+    }
+
+    /**
+     * Question-answering AI service: chats with memory and answers from the
+     * documents retrieved by the {@link RetrievalAugmentor}.
+     */
+    @Bean
+    public QaAssistant qaAssistant(ChatModel chatModel,
+                                   RetrievalAugmentor retrievalAugmentor,
+                                   ChatMemoryRegistry chatMemoryRegistry,
+                                   @Value("${app.chat.model-name:gpt-4o-mini}") String modelName,
+                                   @Value("${app.memory.max-messages:10}") int maxMessages,
+                                   @Value("${app.memory.max-tokens:2000}") int maxTokens) {
+        return AiServices.builder(QaAssistant.class)
+                .chatModel(chatModel)
+                .chatMemoryProvider(createChatMemoryProvider(chatMemoryRegistry, modelName, maxMessages, maxTokens))
+                .retrievalAugmentor(retrievalAugmentor)
                 .build();
     }
 
@@ -58,6 +97,17 @@ public class AiConfig {
                 .apiKey(System.getenv("OPENAI_API_KEY"))
                 .modelName(modelName)
                 .build();
+    }
+
+    private ChatMemoryProvider createChatMemoryProvider(ChatMemoryRegistry chatMemoryRegistry,
+                                                        String modelName,
+                                                        int maxMessages,
+                                                        int maxTokens) {
+        return memoryId -> {
+            ChatMemory chatMemory = createMemory((String) memoryId, modelName, maxMessages, maxTokens);
+            chatMemoryRegistry.register((String) memoryId, chatMemory);
+            return chatMemory;
+        };
     }
 
     private ChatMemory createMemory(String memoryId, String modelName, int maxMessages, int maxTokens) {
