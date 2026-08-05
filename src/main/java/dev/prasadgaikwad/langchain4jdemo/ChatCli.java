@@ -4,6 +4,8 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
+import dev.prasadgaikwad.langchain4jdemo.document.DocumentService;
+import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
@@ -35,16 +37,19 @@ public class ChatCli implements CommandLineRunner {
     private final QaService qaService;
     private final ChatMemoryRegistry chatMemoryRegistry;
     private final SemanticSearchService searchService;
+    private final DocumentService documentService;
     private MemoryType currentMemoryType;
 
     public ChatCli(Assistant assistant,
                    QaService qaService,
                    ChatMemoryRegistry chatMemoryRegistry,
-                   SemanticSearchService searchService) {
+                   SemanticSearchService searchService,
+                   DocumentService documentService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chatMemoryRegistry = chatMemoryRegistry;
         this.searchService = searchService;
+        this.documentService = documentService;
         this.currentMemoryType = MemoryType.MESSAGE_WINDOW;
     }
 
@@ -94,6 +99,7 @@ public class ChatCli implements CommandLineRunner {
             case "/index" -> index(argument);
             case "/search" -> search(argument);
             case "/ask" -> ask(argument);
+            case "/splitter" -> handleSplitterCommand(argument);
             case "/embed" -> embed(argument);
             case "/model" -> handleModelCommand(argument);
             case "/store" -> printStoreStatus();
@@ -156,6 +162,23 @@ public class ChatCli implements CommandLineRunner {
         }
         System.out.println("Indexed " + indexed + " segment(s). Store now holds "
                 + searchService.storeSize() + " embedding(s).");
+    }
+
+    private void handleSplitterCommand(String argument) {
+        if (argument == null || argument.isBlank()) {
+            System.out.println("Splitter type: " + documentService.splitterType().label());
+            System.out.println("Max chunk size: " + documentService.maxChunkSize() + " chars");
+            System.out.println("Max overlap   : " + documentService.maxOverlap() + " chars");
+            return;
+        }
+
+        try {
+            documentService.setSplitterType(DocumentSplitterType.fromLabel(argument.trim()));
+            System.out.println("Switched splitter to '" + argument.trim()
+                    + "'. Re-index documents to re-chunk them with the new strategy.");
+        } catch (IllegalArgumentException e) {
+            System.out.println(e.getMessage());
+        }
     }
 
     private void search(String argument) {
@@ -262,9 +285,11 @@ public class ChatCli implements CommandLineRunner {
                   /memory                     Show current memory type and state
                   /memory <type>              Switch memory type (message-window | token-window)
                   /clear                      Clear the current conversation memory
-                  /index <file|directory>     Load and index documents into the embedding store
+                  /index <file|directory>     Load and index documents into the embedding store (txt, md, pdf)
                   /search <query>             Semantic search over the indexed documents
                   /ask <question>             Answer the question using the indexed documents (RAG)
+                  /splitter                    Show the current document splitter
+                  /splitter <type>             Switch splitter (recursive | paragraph | line | sentence | word | character)
                   /embed <text>               Embed a text and show its vector
                   /model                      Show the current embedding model
                   /model <name>               Switch embedding model (%s)
