@@ -13,6 +13,10 @@ import dev.langchain4j.rag.DefaultRetrievalAugmentor;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.service.AiServices;
+import dev.prasadgaikwad.langchain4jdemo.agent.CalculatorTool;
+import dev.prasadgaikwad.langchain4jdemo.agent.DocumentSearchTool;
+import dev.prasadgaikwad.langchain4jdemo.agent.EmbeddingStoreStatsTool;
+import dev.prasadgaikwad.langchain4jdemo.ai.Agent;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.ai.QaAssistant;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
@@ -84,6 +88,27 @@ public class AiConfig {
                 .chatModel(chatModel)
                 .chatMemoryProvider(createChatMemoryProvider(chatMemoryRegistry, modelName, maxMessages, maxTokens))
                 .retrievalAugmentor(retrievalAugmentor)
+                .build();
+    }
+
+    /**
+     * Agent AI service: chats with memory and can call the registered
+     * {@code @Tool} methods (calculator, document search, store stats) while
+     * working on the task.
+     */
+    @Bean
+    public Agent agent(ChatModel chatModel,
+                       CalculatorTool calculatorTool,
+                       DocumentSearchTool documentSearchTool,
+                       EmbeddingStoreStatsTool storeStatsTool,
+                       ChatMemoryRegistry chatMemoryRegistry,
+                       @Value("${app.chat.model-name:gpt-4o-mini}") String modelName,
+                       @Value("${app.memory.max-messages:10}") int maxMessages,
+                       @Value("${app.memory.max-tokens:2000}") int maxTokens) {
+        return AiServices.builder(Agent.class)
+                .chatModel(chatModel)
+                .chatMemoryProvider(createChatMemoryProvider(chatMemoryRegistry, modelName, maxMessages, maxTokens))
+                .tools(calculatorTool, documentSearchTool, storeStatsTool)
                 .build();
     }
 
