@@ -6,6 +6,7 @@ import dev.langchain4j.rag.AugmentationResult;
 import dev.langchain4j.rag.DefaultRetrievalAugmentor;
 import dev.langchain4j.rag.query.Metadata;
 import dev.prasadgaikwad.langchain4jdemo.FakeEmbeddingModel;
+import dev.prasadgaikwad.langchain4jdemo.document.DocumentService;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -30,7 +31,7 @@ class QaRetrievalAugmentorTest {
                         + "so the model can answer questions from your own documents.");
 
         SemanticSearchService searchService = new SemanticSearchService(
-                modelName -> new FakeEmbeddingModel(), "test", null, 5);
+                modelName -> new FakeEmbeddingModel(), new DocumentService("recursive", 200, 20), "test", null, 5);
         searchService.indexDirectory(docs);
 
         SemanticSearchContentRetriever retriever = new SemanticSearchContentRetriever(searchService, 5);
@@ -51,7 +52,7 @@ class QaRetrievalAugmentorTest {
     @Test
     void augmentWithEmptyStoreLeavesTheUserMessageUntouched() {
         SemanticSearchService searchService = new SemanticSearchService(
-                modelName -> new FakeEmbeddingModel(), "test", null, 5);
+                modelName -> new FakeEmbeddingModel(), new DocumentService("recursive", 200, 20), "test", null, 5);
         SemanticSearchContentRetriever retriever = new SemanticSearchContentRetriever(searchService, 5);
         DefaultRetrievalAugmentor augmentor = DefaultRetrievalAugmentor.builder()
                 .contentRetriever(retriever)

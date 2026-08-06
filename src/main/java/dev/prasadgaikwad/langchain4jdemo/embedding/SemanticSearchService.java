@@ -1,16 +1,13 @@
 package dev.prasadgaikwad.langchain4jdemo.embedding;
 
-import dev.langchain4j.data.document.Document;
-import dev.langchain4j.data.document.loader.FileSystemDocumentLoader;
-import dev.langchain4j.data.document.splitter.DocumentSplitters;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
-import dev.langchain4j.store.embedding.EmbeddingStoreIngestor;
 import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
+import dev.prasadgaikwad.langchain4jdemo.document.DocumentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -23,8 +20,9 @@ import java.util.function.Function;
 /**
  * Semantic search over a set of documents.
  * <p>
- * Documents are split into {@link TextSegment}s, embedded with the configured
- * {@link EmbeddingModel}, and stored in an {@link InMemoryEmbeddingStore} which
+ * Documents are loaded, parsed, and split into {@link TextSegment}s by
+ * {@link DocumentService}, then embedded with the configured
+ * {@link EmbeddingModel} and stored in an {@link InMemoryEmbeddingStore} which
  * can be persisted to (and restored from) a JSON file.
  * <p>
  * The embedding model can be switched at runtime via {@link #setEmbeddingModel(String)}.
@@ -32,10 +30,8 @@ import java.util.function.Function;
 @Service
 public class SemanticSearchService {
 
-    private static final int MAX_SEGMENT_SIZE_IN_CHARS = 200;
-    private static final int MAX_OVERLAP_SIZE_IN_CHARS = 20;
-
     private final Function<String, EmbeddingModel> modelFactory;
+    private final DocumentService documentService;
     private final InMemoryEmbeddingStore<TextSegment> embeddingStore;
     private final Path storePath;
     private final int defaultMaxResults;
@@ -44,10 +40,12 @@ public class SemanticSearchService {
 
     @Autowired
     public SemanticSearchService(Function<String, EmbeddingModel> modelFactory,
+                                 DocumentService documentService,
                                  @Value("${app.embedding.model-name:text-embedding-3-small}") String modelName,
                                  @Value("${app.embedding.store-path:}") String storePath,
                                  @Value("${app.embedding.max-results:5}") int defaultMaxResults) {
         this.modelFactory = modelFactory;
+        this.documentService = documentService;
         this.modelName = modelName;
         this.embeddingModel = modelFactory.apply(modelName);
         this.storePath = storePath == null || storePath.isBlank() ? null : Path.of(storePath);
@@ -56,8 +54,9 @@ public class SemanticSearchService {
     }
 
     // package-private constructor for unit tests (no Spring, no API key needed)
-    SemanticSearchService(EmbeddingModel embeddingModel, String storePath, int defaultMaxResults) {
-        this(modelName -> embeddingModel, "test", storePath, defaultMaxResults);
+    SemanticSearchService(EmbeddingModel embeddingModel, DocumentService documentService,
+                          String storePath, int defaultMaxResults) {
+        this(modelName -> embeddingModel, documentService, "test", storePath, defaultMaxResults);
     }
 
     private InMemoryEmbeddingStore<TextSegment> loadStore() {
@@ -68,31 +67,30 @@ public class SemanticSearchService {
     }
 
     /**
-     * Loads a single document file, splits it, embeds it, and stores the segments.
+     * Loads, parses, splits, embeds, and stores a single document file.
      *
      * @return the number of segments indexed
      */
     public int indexDocument(Path filePath) {
-        return ingest(List.of(FileSystemDocumentLoader.loadDocument(filePath)));
+        return indexSegments(documentService.loadAndSplit(filePath));
     }
 
     /**
-     * Loads all documents from a directory, splits them, embeds them, and stores the segments.
+     * Loads, parses, splits, embeds, and stores all documents in a directory.
      *
      * @return the number of segments indexed
      */
     public int indexDirectory(Path directoryPath) {
-        return ingest(FileSystemDocumentLoader.loadDocuments(directoryPath));
+        return indexSegments(documentService.loadAndSplitDirectory(directoryPath));
     }
 
-    private int ingest(List<Document> documents) {
+    private int indexSegments(List<TextSegment> segments) {
+        if (segments.isEmpty()) {
+            return 0;
+        }
         int sizeBefore = embeddingStore.size();
-        EmbeddingStoreIngestor.builder()
-                .documentSplitter(DocumentSplitters.recursive(MAX_SEGMENT_SIZE_IN_CHARS, MAX_OVERLAP_SIZE_IN_CHARS))
-                .embeddingModel(embeddingModel)
-                .embeddingStore(embeddingStore)
-                .build()
-                .ingest(documents);
+        List<Embedding> embeddings = embeddingModel.embedAll(segments).content();
+        embeddingStore.addAll(embeddings, segments);
         save();
         return embeddingStore.size() - sizeBefore;
     }

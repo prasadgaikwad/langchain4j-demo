@@ -3,6 +3,7 @@ package dev.prasadgaikwad.langchain4jdemo.rag;
 import dev.langchain4j.rag.content.Content;
 import dev.langchain4j.rag.query.Query;
 import dev.prasadgaikwad.langchain4jdemo.FakeEmbeddingModel;
+import dev.prasadgaikwad.langchain4jdemo.document.DocumentService;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -46,6 +47,7 @@ class SemanticSearchContentRetrieverTest {
     }
 
     private SemanticSearchService newSemanticSearchService() {
-        return new SemanticSearchService(modelName -> new FakeEmbeddingModel(), "test", null, 3);
+        return new SemanticSearchService(modelName -> new FakeEmbeddingModel(),
+                new DocumentService("recursive", 200, 20), "test", null, 3);
     }
 }

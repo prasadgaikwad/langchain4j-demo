@@ -4,6 +4,7 @@ import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.prasadgaikwad.langchain4jdemo.FakeEmbeddingModel;
+import dev.prasadgaikwad.langchain4jdemo.document.DocumentService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -18,9 +19,18 @@ class SemanticSearchServiceTest {
     @TempDir
     Path tempDir;
 
+    private SemanticSearchService newService() {
+        return newService(null);
+    }
+
+    private SemanticSearchService newService(String storePath) {
+        return new SemanticSearchService(new FakeEmbeddingModel(), new DocumentService("recursive", 200, 20),
+                storePath, 3);
+    }
+
     @Test
     void searchOnEmptyStoreReturnsNoResults() {
-        SemanticSearchService service = new SemanticSearchService(new FakeEmbeddingModel(), null, 3);
+        SemanticSearchService service = newService();
 
         assertThat(service.search("anything")).isEmpty();
     }
@@ -34,7 +44,7 @@ class SemanticSearchServiceTest {
         Files.writeString(dataDir.resolve("cats.txt"),
                 "Cats are small, furry animals often kept as pets and known for their independence.");
 
-        SemanticSearchService service = new SemanticSearchService(new FakeEmbeddingModel(), null, 3);
+        SemanticSearchService service = newService();
         int indexed = service.indexDirectory(dataDir);
 
         assertThat(indexed).isGreaterThan(0);
@@ -52,11 +62,11 @@ class SemanticSearchServiceTest {
         Files.writeString(document, "Retrieval augmented generation combines a vector database with a chat model.");
         Path storeFile = tempDir.resolve("store.json");
 
-        SemanticSearchService first = new SemanticSearchService(new FakeEmbeddingModel(), storeFile.toString(), 3);
+        SemanticSearchService first = newService(storeFile.toString());
         assertThat(first.indexDocument(document)).isGreaterThan(0);
         assertThat(first.storeSize()).isGreaterThan(0);
 
-        SemanticSearchService second = new SemanticSearchService(new FakeEmbeddingModel(), storeFile.toString(), 3);
+        SemanticSearchService second = newService(storeFile.toString());
         assertThat(second.storeSize()).isEqualTo(first.storeSize());
 
         List<EmbeddingMatch<TextSegment>> matches = second.search("vector database");
@@ -66,7 +76,7 @@ class SemanticSearchServiceTest {
 
     @Test
     void embedReturnsVectorOfModelDimension() {
-        SemanticSearchService service = new SemanticSearchService(new FakeEmbeddingModel(), null, 3);
+        SemanticSearchService service = newService();
 
         Embedding embedding = service.embed("hello world");
 
@@ -75,7 +85,7 @@ class SemanticSearchServiceTest {
 
     @Test
     void switchingModelUpdatesModelName() {
-        SemanticSearchService service = new SemanticSearchService(new FakeEmbeddingModel(), null, 3);
+        SemanticSearchService service = newService();
 
         service.setEmbeddingModel("test-model");
 
