@@ -10,6 +10,12 @@ import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
+import dev.prasadgaikwad.langchain4jdemo.prompt.FewShotAssistant;
+import dev.prasadgaikwad.langchain4jdemo.prompt.MovieExtractor;
+import dev.prasadgaikwad.langchain4jdemo.prompt.MovieReview;
+import dev.prasadgaikwad.langchain4jdemo.prompt.PromptService;
+import dev.prasadgaikwad.langchain4jdemo.prompt.Sentiment;
+import dev.prasadgaikwad.langchain4jdemo.prompt.TopicExtractor;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -41,6 +47,10 @@ public class ChatCli implements CommandLineRunner {
     private final SemanticSearchService searchService;
     private final DocumentService documentService;
     private final ChainService chainService;
+    private final PromptService promptService;
+    private final FewShotAssistant fewShotAssistant;
+    private final MovieExtractor movieExtractor;
+    private final TopicExtractor topicExtractor;
     private MemoryType currentMemoryType;
 
     public ChatCli(Assistant assistant,
@@ -48,13 +58,21 @@ public class ChatCli implements CommandLineRunner {
                    ChatMemoryRegistry chatMemoryRegistry,
                    SemanticSearchService searchService,
                    DocumentService documentService,
-                   ChainService chainService) {
+                   ChainService chainService,
+                   PromptService promptService,
+                   FewShotAssistant fewShotAssistant,
+                   MovieExtractor movieExtractor,
+                   TopicExtractor topicExtractor) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chatMemoryRegistry = chatMemoryRegistry;
         this.searchService = searchService;
         this.documentService = documentService;
         this.chainService = chainService;
+        this.promptService = promptService;
+        this.fewShotAssistant = fewShotAssistant;
+        this.movieExtractor = movieExtractor;
+        this.topicExtractor = topicExtractor;
         this.currentMemoryType = MemoryType.MESSAGE_WINDOW;
     }
 
@@ -105,6 +123,10 @@ public class ChatCli implements CommandLineRunner {
             case "/search" -> search(argument);
             case "/ask" -> ask(argument);
             case "/agent" -> runAgent(argument);
+            case "/template" -> showTemplate(argument);
+            case "/sentiment" -> classifySentiment(argument);
+            case "/movie" -> extractMovie(argument);
+            case "/topics" -> extractTopics(argument);
             case "/splitter" -> handleSplitterCommand(argument);
             case "/embed" -> embed(argument);
             case "/model" -> handleModelCommand(argument);
@@ -233,6 +255,47 @@ public class ChatCli implements CommandLineRunner {
         System.out.println();
     }
 
+    private void showTemplate(String argument) {
+        String movie = argument != null && !argument.isBlank() ? argument.trim() : "Inception";
+        System.out.println("Rendered prompt template for \"" + movie + "\" (year 2010, enthusiastic tone):");
+        System.out.println();
+        System.out.println(promptService.renderMovieReviewPrompt(movie, 2010, "enthusiastic"));
+        System.out.println();
+    }
+
+    private void classifySentiment(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /sentiment <text>");
+            return;
+        }
+
+        Sentiment sentiment = fewShotAssistant.classify(argument.trim());
+        System.out.println("Sentiment > " + sentiment);
+        System.out.println();
+    }
+
+    private void extractMovie(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /movie <text>");
+            return;
+        }
+
+        MovieReview review = movieExtractor.extract(argument.trim());
+        System.out.println("Movie > " + review);
+        System.out.println();
+    }
+
+    private void extractTopics(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /topics <text>");
+            return;
+        }
+
+        List<String> topics = topicExtractor.extract(argument.trim());
+        System.out.println("Topics > " + topics);
+        System.out.println();
+    }
+
     private void embed(String argument) {
         if (argument == null) {
             System.out.println("Usage: /embed <text>");
@@ -306,6 +369,10 @@ public class ChatCli implements CommandLineRunner {
                   /search <query>             Semantic search over the indexed documents
                   /ask <question>             Answer the question using the indexed documents (RAG)
                   /agent <task>               Execute a task with the tool-using agent
+                  /template [movie]           Render a prompt template (no API call)
+                  /sentiment <text>           Classify sentiment with few-shot examples
+                  /movie <text>               Extract structured movie data (output parser)
+                  /topics <text>              Extract a list of topics (output parser)
                   /splitter                    Show the current document splitter
                   /splitter <type>             Switch splitter (recursive | paragraph | line | sentence | word | character)
                   /embed <text>               Embed a text and show its vector

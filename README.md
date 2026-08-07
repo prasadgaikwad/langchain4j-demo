@@ -43,6 +43,10 @@ LangChain4j is a Java framework that simplifies the development of applications 
   - A tool-using agent (`AiServices` + `@Tool` methods) with chat memory
   - Tools: arithmetic calculator, document search, embedding-store stats
   - A custom processing chain that routes arithmetic locally and delegates everything else to the agent
+- Prompting techniques:
+  - Prompt templates (`PromptTemplate` with `{{placeholders}}`) rendered without an API call
+  - Few-shot classification: labeled examples embedded in the system message
+  - Output parsers / structured output: AI services returning an enum, a POJO record, or a `List<String>`
 
 ## Running the Demo
 1. Set your API key: `export OPENAI_API_KEY=...` (or configure `application.properties`)
@@ -58,6 +62,10 @@ LangChain4j is a Java framework that simplifies the development of applications 
 /search <query>             Semantic search over the indexed documents
 /ask <question>             Answer the question using the indexed documents (RAG)
 /agent <task>               Execute a task with the tool-using agent
+/template [movie]           Render a prompt template (no API call)
+/sentiment <text>           Classify sentiment with few-shot examples
+/movie <text>               Extract structured movie data (output parser)
+/topics <text>              Extract a list of topics (output parser)
 /splitter                   Show the current document splitter
 /splitter <type>            Switch splitter (recursive | paragraph | line | sentence | word | character)
 /embed <text>               Embed a text and show its vector
@@ -76,6 +84,10 @@ Try a semantic search with the bundled sample documents:
 /ask what does the document say about RAG?
 /agent compute (20 * 5) - 8
 /agent what do the documents say about agents?
+/template Inception
+/sentiment I absolutely loved this movie!
+/movie Inception is a 2010 film directed by Christopher Nolan about dreams. It was great.
+/topics RAG combines retrieval with generation to answer from your own documents
 ```
 
 ## Experiments Completed
@@ -84,6 +96,7 @@ Try a semantic search with the bundled sample documents:
 3. **Document Processing** — PDF + text parsing, text splitting strategies, configurable chunk size/overlap
 4. **RAG (Retrieval Augmented Generation)** — document retrieval + question-answering system
 5. **Chains and Agents** — custom processing chain, specialized tool-using agent, `@Tool` implementations
+6. **Prompting Techniques** — prompt templates, few-shot learning examples, output parsers / structured output
 
 ## Future Experiments and Features to Try
 
@@ -92,23 +105,18 @@ Try a semantic search with the bundled sample documents:
    - Experiment with different models (GPT-4, Claude)
    - Compare performance and capabilities
 
-2. **Prompting Techniques**
-   - Few-shot learning examples
-   - Prompt templates
-   - Output parsers
-
-3. **Integration Features**
+2. **Integration Features**
    - REST API endpoints
    - Streaming responses
    - WebSocket support
    - Database integration
 
-4. **Evaluation and Testing**
+3. **Evaluation and Testing**
    - Implement evaluation metrics
    - Create test suites for LLM responses
    - Benchmark different approaches
 
-5. **Advanced Features**
+4. **Advanced Features**
    - Multi-modal capabilities
    - Structured output formatting
    - Advanced agent orchestration (LangChain4j `agentic` module)
