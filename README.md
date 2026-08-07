@@ -32,6 +32,17 @@ LangChain4j is a Java framework that simplifies the development of applications 
   - Index text files or directories into an `InMemoryEmbeddingStore` (persisted to JSON)
   - Semantic search over indexed documents with relevance scores
   - Switchable embedding models (`text-embedding-3-small`, `text-embedding-3-large`, `text-embedding-ada-002`)
+- Document processing:
+  - PDF loading and parsing (Apache PDFBox) plus plain-text files
+  - Pluggable text splitting strategies (`recursive`, `paragraph`, `line`, `sentence`, `word`, `character`)
+  - Configurable chunk size and overlap
+- RAG (Retrieval Augmented Generation):
+  - Question answering over your own documents via a `RetrievalAugmentor`
+  - Retrieval of the most relevant chunks before each model call
+- Chains and agents:
+  - A tool-using agent (`AiServices` + `@Tool` methods) with chat memory
+  - Tools: arithmetic calculator, document search, embedding-store stats
+  - A custom processing chain that routes arithmetic locally and delegates everything else to the agent
 
 ## Running the Demo
 1. Set your API key: `export OPENAI_API_KEY=...` (or configure `application.properties`)
@@ -43,8 +54,12 @@ LangChain4j is a Java framework that simplifies the development of applications 
 /memory                     Show current memory type and state
 /memory <type>              Switch memory type (message-window | token-window)
 /clear                      Clear the current conversation memory
-/index <file|directory>     Load and index documents into the embedding store
+/index <file|directory>     Load and index documents into the embedding store (txt, md, pdf)
 /search <query>             Semantic search over the indexed documents
+/ask <question>             Answer the question using the indexed documents (RAG)
+/agent <task>               Execute a task with the tool-using agent
+/splitter                   Show the current document splitter
+/splitter <type>            Switch splitter (recursive | paragraph | line | sentence | word | character)
 /embed <text>               Embed a text and show its vector
 /model                      Show the current embedding model
 /model <name>               Switch embedding model
@@ -58,61 +73,45 @@ Try a semantic search with the bundled sample documents:
 ```
 /index sample-data
 /search what is a vector database?
+/ask what does the document say about RAG?
+/agent compute (20 * 5) - 8
+/agent what do the documents say about agents?
 ```
+
+## Experiments Completed
+1. **Memory and Context** — conversation memory with `@MemoryId`, switchable between `message-window` and `token-window` types
+2. **Embeddings** — embedding generation, semantic search, switchable embedding models
+3. **Document Processing** — PDF + text parsing, text splitting strategies, configurable chunk size/overlap
+4. **RAG (Retrieval Augmented Generation)** — document retrieval + question-answering system
+5. **Chains and Agents** — custom processing chain, specialized tool-using agent, `@Tool` implementations
 
 ## Future Experiments and Features to Try
 
 1. **LLM Integration**
-   - Connect with different LLM providers (OpenAI, Anthropic, etc.)
-   - Experiment with different models (GPT-3.5, GPT-4, Claude)
+   - Connect with different LLM providers (Anthropic, Google, local models via Ollama)
+   - Experiment with different models (GPT-4, Claude)
    - Compare performance and capabilities
 
-2. **Memory and Context**
-   - Implement conversation memory
-   - Try different memory types (Buffer, Summary, Vector)
-   - Experiment with context windows
-
-3. **Embeddings**
-   - Create and store embeddings
-   - Implement semantic search
-   - Try different embedding models
-
-4. **Document Processing**
-   - PDF document loading and parsing
-   - Text splitting strategies
-   - Document question-answering
-
-5. **Chains and Agents**
-   - Build custom processing chains
-   - Create specialized agents for specific tasks
-   - Implement tools for agents to use
-
-6. **RAG (Retrieval Augmented Generation)**
-   - Set up vector databases
-   - Implement document retrieval
-   - Create question-answering systems
-
-7. **Prompting Techniques**
+2. **Prompting Techniques**
    - Few-shot learning examples
    - Prompt templates
    - Output parsers
 
-8. **Integration Features**
+3. **Integration Features**
    - REST API endpoints
    - Streaming responses
    - WebSocket support
    - Database integration
 
-9. **Evaluation and Testing**
+4. **Evaluation and Testing**
    - Implement evaluation metrics
    - Create test suites for LLM responses
    - Benchmark different approaches
 
-10. **Advanced Features**
-    - Multi-modal capabilities
-    - Function calling
-    - Structured output formatting
-    - Custom tools development
+5. **Advanced Features**
+   - Multi-modal capabilities
+   - Structured output formatting
+   - Advanced agent orchestration (LangChain4j `agentic` module)
 
 ## Getting Started
 1. Clone the repository
@@ -130,11 +129,16 @@ Try a semantic search with the bundled sample documents:
 | `app.embedding.model-name`  | `text-embedding-3-small` | Embedding model used for indexing/search     |
 | `app.embedding.store-path`  | `embedding-store.json`  | JSON file for persisting the embedding store |
 | `app.embedding.max-results` | `5`                     | Default number of search results             |
+| `app.rag.max-results`       | `5`                     | Chunks retrieved for each RAG question       |
+| `app.document.splitter`     | `recursive`             | Document text splitting strategy             |
+| `app.document.max-chunk-size` | `200`                 | Max chunk size in characters                 |
+| `app.document.max-overlap`  | `20`                    | Overlap between consecutive chunks           |
 
 ## Current Dependency Versions
 - Spring Boot 3.5.7
 - LangChain4j BOM 1.18.1
 - `langchain4j` and `langchain4j-open-ai` from the BOM
+- `langchain4j-document-parser-apache-pdfbox` for PDF parsing
 
 ## Dependencies
 - Spring Boot

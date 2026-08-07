@@ -4,6 +4,7 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
+import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
@@ -21,8 +22,9 @@ import java.util.Locale;
 import java.util.Scanner;
 
 /**
- * Interactive command-line interface combining conversation chat with semantic
- * search over embedded documents. Disabled in tests via
+ * Interactive command-line interface combining conversation chat, semantic
+ * search over embedded documents, RAG question answering, and a tool-using
+ * agent. Disabled in tests via
  * {@code app.cli.enabled=false} so the context can load without blocking on stdin.
  */
 @Component
@@ -38,18 +40,21 @@ public class ChatCli implements CommandLineRunner {
     private final ChatMemoryRegistry chatMemoryRegistry;
     private final SemanticSearchService searchService;
     private final DocumentService documentService;
+    private final ChainService chainService;
     private MemoryType currentMemoryType;
 
     public ChatCli(Assistant assistant,
                    QaService qaService,
                    ChatMemoryRegistry chatMemoryRegistry,
                    SemanticSearchService searchService,
-                   DocumentService documentService) {
+                   DocumentService documentService,
+                   ChainService chainService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chatMemoryRegistry = chatMemoryRegistry;
         this.searchService = searchService;
         this.documentService = documentService;
+        this.chainService = chainService;
         this.currentMemoryType = MemoryType.MESSAGE_WINDOW;
     }
 
@@ -99,6 +104,7 @@ public class ChatCli implements CommandLineRunner {
             case "/index" -> index(argument);
             case "/search" -> search(argument);
             case "/ask" -> ask(argument);
+            case "/agent" -> runAgent(argument);
             case "/splitter" -> handleSplitterCommand(argument);
             case "/embed" -> embed(argument);
             case "/model" -> handleModelCommand(argument);
@@ -216,6 +222,17 @@ public class ChatCli implements CommandLineRunner {
         System.out.println();
     }
 
+    private void runAgent(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /agent <task>");
+            return;
+        }
+
+        String answer = chainService.ask(currentMemoryType.memoryId(CONVERSATION_ID), argument.trim());
+        System.out.println("Agent > " + answer);
+        System.out.println();
+    }
+
     private void embed(String argument) {
         if (argument == null) {
             System.out.println("Usage: /embed <text>");
@@ -288,6 +305,7 @@ public class ChatCli implements CommandLineRunner {
                   /index <file|directory>     Load and index documents into the embedding store (txt, md, pdf)
                   /search <query>             Semantic search over the indexed documents
                   /ask <question>             Answer the question using the indexed documents (RAG)
+                  /agent <task>               Execute a task with the tool-using agent
                   /splitter                    Show the current document splitter
                   /splitter <type>             Switch splitter (recursive | paragraph | line | sentence | word | character)
                   /embed <text>               Embed a text and show its vector
