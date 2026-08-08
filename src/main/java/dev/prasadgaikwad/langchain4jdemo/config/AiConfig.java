@@ -22,6 +22,9 @@ import dev.prasadgaikwad.langchain4jdemo.ai.QaAssistant;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
+import dev.prasadgaikwad.langchain4jdemo.prompt.FewShotAssistant;
+import dev.prasadgaikwad.langchain4jdemo.prompt.MovieExtractor;
+import dev.prasadgaikwad.langchain4jdemo.prompt.TopicExtractor;
 import dev.prasadgaikwad.langchain4jdemo.rag.SemanticSearchContentRetriever;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -109,6 +112,39 @@ public class AiConfig {
                 .chatModel(chatModel)
                 .chatMemoryProvider(createChatMemoryProvider(chatMemoryRegistry, modelName, maxMessages, maxTokens))
                 .tools(calculatorTool, documentSearchTool, storeStatsTool)
+                .build();
+    }
+
+    /**
+     * Few-shot classification AI service: the system message embeds labeled
+     * examples and the {@code Sentiment} return type parses the reply.
+     */
+    @Bean
+    public FewShotAssistant fewShotAssistant(ChatModel chatModel) {
+        return AiServices.builder(FewShotAssistant.class)
+                .chatModel(chatModel)
+                .build();
+    }
+
+    /**
+     * Structured-output AI service: returns a {@code MovieReview} record parsed
+     * from the model's JSON reply.
+     */
+    @Bean
+    public MovieExtractor movieExtractor(ChatModel chatModel) {
+        return AiServices.builder(MovieExtractor.class)
+                .chatModel(chatModel)
+                .build();
+    }
+
+    /**
+     * Collection-output AI service: returns a {@code List<String>} parsed from
+     * a JSON array in the model's reply.
+     */
+    @Bean
+    public TopicExtractor topicExtractor(ChatModel chatModel) {
+        return AiServices.builder(TopicExtractor.class)
+                .chatModel(chatModel)
                 .build();
     }
 
