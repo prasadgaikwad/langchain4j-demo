@@ -47,6 +47,11 @@ LangChain4j is a Java framework that simplifies the development of applications 
   - Prompt templates (`PromptTemplate` with `{{placeholders}}`) rendered without an API call
   - Few-shot classification: labeled examples embedded in the system message
   - Output parsers / structured output: AI services returning an enum, a POJO record, or a `List<String>`
+- Integration features:
+  - REST API under `/api` (chat, RAG, agent, sentiment, movie, topics, search, history)
+  - Streaming responses via Server-Sent Events (`/api/chat/stream`)
+  - WebSocket streaming chat at `/ws/chat`
+  - Database-backed conversation history (H2 via Spring Data JPA)
 
 ## Running the Demo
 1. Set your API key: `export OPENAI_API_KEY=...` (or configure `application.properties`)
@@ -90,6 +95,31 @@ Try a semantic search with the bundled sample documents:
 /topics RAG combines retrieval with generation to answer from your own documents
 ```
 
+## Web API
+
+The same features are exposed over HTTP once the app is running (open
+http://localhost:8080 for a summary page and http://localhost:8080/chat.html for an
+SSE + WebSocket chat client).
+
+| Method | Endpoint              | Description                                              |
+|--------|-----------------------|----------------------------------------------------------|
+| POST   | `/api/chat`           | Chat with the memory-backed assistant (`{message}`)      |
+| POST   | `/api/ask`            | RAG question over indexed documents (`{question}`)       |
+| POST   | `/api/agent`          | Delegate a task to the tool-using agent (`{task}`)       |
+| GET    | `/api/chat/stream`    | Stream a chat reply over Server-Sent Events (`?message=`)|
+| POST   | `/api/prompt/sentiment` | Sentiment classification (`{text}`)                    |
+| POST   | `/api/prompt/movie`   | Extract structured movie data (`{text}`)                 |
+| POST   | `/api/prompt/topics`  | Extract a topic list (`{text}`)                          |
+| GET    | `/api/search`         | Semantic search over indexed documents (`?query=`)       |
+| GET    | `/api/history`        | List all conversations                                   |
+| GET    | `/api/history/{id}`   | Fetch the message history of one conversation            |
+| DELETE | `/api/history/{id}`   | Delete a conversation's history                          |
+| WS     | `/ws/chat`            | Stream chat tokens as frames, ending with `[DONE]`       |
+
+Conversation history is persisted in an in-memory H2 database via Spring Data
+JPA (`spring.datasource.*` below); the H2 console is available at
+http://localhost:8080/h2-console.
+
 ## Experiments Completed
 1. **Memory and Context** — conversation memory with `@MemoryId`, switchable between `message-window` and `token-window` types
 2. **Embeddings** — embedding generation, semantic search, switchable embedding models
@@ -97,6 +127,7 @@ Try a semantic search with the bundled sample documents:
 4. **RAG (Retrieval Augmented Generation)** — document retrieval + question-answering system
 5. **Chains and Agents** — custom processing chain, specialized tool-using agent, `@Tool` implementations
 6. **Prompting Techniques** — prompt templates, few-shot learning examples, output parsers / structured output
+7. **Integration Features** — REST API, streaming (SSE), WebSocket chat, database-backed history (H2 + Spring Data JPA)
 
 ## Future Experiments and Features to Try
 
@@ -105,18 +136,12 @@ Try a semantic search with the bundled sample documents:
    - Experiment with different models (GPT-4, Claude)
    - Compare performance and capabilities
 
-2. **Integration Features**
-   - REST API endpoints
-   - Streaming responses
-   - WebSocket support
-   - Database integration
-
-3. **Evaluation and Testing**
+2. **Evaluation and Testing**
    - Implement evaluation metrics
    - Create test suites for LLM responses
    - Benchmark different approaches
 
-4. **Advanced Features**
+3. **Advanced Features**
    - Multi-modal capabilities
    - Structured output formatting
    - Advanced agent orchestration (LangChain4j `agentic` module)
@@ -141,12 +166,16 @@ Try a semantic search with the bundled sample documents:
 | `app.document.splitter`     | `recursive`             | Document text splitting strategy             |
 | `app.document.max-chunk-size` | `200`                 | Max chunk size in characters                 |
 | `app.document.max-overlap`  | `20`                    | Overlap between consecutive chunks           |
+| `spring.datasource.url`    | `jdbc:h2:mem:demo;DB_CLOSE_DELAY=-1` | JDBC URL for conversation history |
+| `spring.jpa.hibernate.ddl-auto` | `create-drop`       | Hibernate schema generation for history     |
+| `spring.h2.console.enabled` | `true`                  | Enable the H2 web console                   |
 
 ## Current Dependency Versions
 - Spring Boot 3.5.7
 - LangChain4j BOM 1.18.1
 - `langchain4j` and `langchain4j-open-ai` from the BOM
 - `langchain4j-document-parser-apache-pdfbox` for PDF parsing
+- `spring-boot-starter-web`, `spring-boot-starter-websocket`, `spring-boot-starter-data-jpa`, and H2 for the REST/streaming/WebSocket/DB integration
 
 ## Dependencies
 - Spring Boot

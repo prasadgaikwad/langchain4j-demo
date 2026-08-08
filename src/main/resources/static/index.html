@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LangChain4j Demo</title>
+    <style>
+        body { font-family: sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+        code { background: #f0f0f0; padding: 0 .3rem; }
+    </style>
+</head>
+<body>
+<h1>LangChain4j Demo</h1>
+<p>Interactive streaming demo: <a href="/chat.html">/chat.html</a></p>
+<h2>REST API</h2>
+<ul>
+    <li><code>POST /api/chat</code> <code>{"message": "..."}</code> - chat with memory</li>
+    <li><code>POST /api/ask</code> <code>{"message": "..."}</code> - RAG question answering</li>
+    <li><code>POST /api/agent</code> <code>{"message": "..."}</code> - tool-using agent</li>
+    <li><code>GET /api/chat/stream?message=...</code> - streaming chat (SSE)</li>
+    <li><code>POST /api/sentiment</code> <code>{"text": "..."}</code> - few-shot classification</li>
+    <li><code>POST /api/movie</code> <code>{"text": "..."}</code> - structured extraction</li>
+    <li><code>POST /api/topics</code> <code>{"text": "..."}</code> - topic list</li>
+    <li><code>GET /api/template?movie=...</code> - rendered prompt template</li>
+    <li><code>POST /api/index?path=...</code> - index documents</li>
+    <li><code>GET /api/search?q=...</code> - semantic search</li>
+    <li><code>GET /api/store</code> - embedding store stats</li>
+    <li><code>GET /api/history</code>, <code>GET /api/history/{id}</code>, <code>DELETE /api/history/{id}</code> - DB history</li>
+</ul>
+<h2>WebSocket</h2>
+<ul>
+    <li><code>ws://localhost:8080/ws/chat</code> - send <code>{"message": "..."}</code>, receive tokens</li>
+</ul>
+<h2>CLI</h2>
+<p>The interactive CLI still runs on startup (type <code>quit</code> to exit).</p>
+</body>
+</html>
