@@ -5,9 +5,11 @@ import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.memory.chat.TokenWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
 import dev.langchain4j.rag.DefaultRetrievalAugmentor;
 import dev.langchain4j.rag.RetrievalAugmentor;
@@ -38,6 +40,18 @@ public class AiConfig {
     @Bean
     public ChatModel chatModel(@Value("${app.chat.model-name:gpt-4o-mini}") String modelName) {
         return OpenAiChatModel.builder()
+                .apiKey(System.getenv("OPENAI_API_KEY"))
+                .modelName(modelName)
+                .build();
+    }
+
+    /**
+     * Streaming variant of the chat model, used by the SSE and WebSocket
+     * endpoints to forward tokens as they are generated.
+     */
+    @Bean
+    public StreamingChatModel streamingChatModel(@Value("${app.chat.model-name:gpt-4o-mini}") String modelName) {
+        return OpenAiStreamingChatModel.builder()
                 .apiKey(System.getenv("OPENAI_API_KEY"))
                 .modelName(modelName)
                 .build();
