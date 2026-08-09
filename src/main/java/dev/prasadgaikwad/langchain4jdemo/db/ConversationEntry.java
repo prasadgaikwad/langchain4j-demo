@@ -1,5 +1,6 @@
 package dev.prasadgaikwad.langchain4jdemo.db;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -15,19 +16,25 @@ import java.time.Instant;
  */
 @Entity
 @Table(name = "conversation_entries")
+@Schema(description = "One persisted chat message in a conversation")
 public class ConversationEntry {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Schema(description = "Auto-generated id")
     private Long id;
 
+    @Schema(description = "Conversation (memory) id the message belongs to", example = "web")
     private String conversationId;
 
+    @Schema(description = "Message role", example = "user")
     private String role;
 
     @Column(length = 4000)
+    @Schema(description = "The message text", example = "Hello! How do I use RAG?")
     private String text;
 
+    @Schema(description = "When the message was recorded (ISO-8601)")
     private Instant timestamp;
 
     protected ConversationEntry() {

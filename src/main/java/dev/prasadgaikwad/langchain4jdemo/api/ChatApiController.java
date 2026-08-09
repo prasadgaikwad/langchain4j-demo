@@ -5,6 +5,12 @@ import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +28,7 @@ import java.io.IOException;
  */
 @RestController
 @RequestMapping("/api")
+@Tag(name = "Chat", description = "Chat, RAG, and agent endpoints backed by LangChain4j AI services")
 public class ChatApiController {
 
     private final Assistant assistant;
@@ -43,18 +50,33 @@ public class ChatApiController {
     }
 
     @PostMapping("/chat")
+    @Operation(summary = "Chat with the memory-backed assistant",
+            description = "Sends the message to the assistant with conversation memory. "
+                    + "Use a conversationId to keep a multi-turn conversation; a new id starts fresh.")
+    @ApiResponse(responseCode = "200", description = "The assistant's answer",
+            content = @Content(schema = @Schema(implementation = ChatResponse.class)))
     public ChatResponse chat(@RequestBody ChatRequest request) {
         String answer = assistant.chat(request.conversationId(), request.message());
         return new ChatResponse(answer);
     }
 
     @PostMapping("/ask")
+    @Operation(summary = "Ask a question over indexed documents (RAG)",
+            description = "Answers the question using the most relevant chunks from the "
+                    + "embedding store via a RetrievalAugmentor.")
+    @ApiResponse(responseCode = "200", description = "The answer grounded in the indexed documents",
+            content = @Content(schema = @Schema(implementation = ChatResponse.class)))
     public ChatResponse ask(@RequestBody ChatRequest request) {
         String answer = qaService.ask(request.conversationId(), request.message());
         return new ChatResponse(answer);
     }
 
     @PostMapping("/agent")
+    @Operation(summary = "Delegate a task to the tool-using agent",
+            description = "Runs the task through the custom chain, routing arithmetic to a local "
+                    + "calculator and everything else to the tool-using agent (search, store stats).")
+    @ApiResponse(responseCode = "200", description = "The agent's result",
+            content = @Content(schema = @Schema(implementation = ChatResponse.class)))
     public ChatResponse agent(@RequestBody ChatRequest request) {
         String answer = chainService.ask(request.conversationId(), request.message());
         return new ChatResponse(answer);
@@ -67,7 +89,12 @@ public class ChatApiController {
      * silently drop spaces between words.
      */
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream(@RequestParam String message) {
+    @Operation(summary = "Stream a chat reply token by token (SSE)",
+            description = "Returns a text/event-stream where every event is a JSON-encoded token. "
+                    + "Each token is JSON-encoded so spaces between words survive the SSE transport.")
+    @ApiResponse(responseCode = "200", description = "A stream of JSON-encoded tokens")
+    public SseEmitter stream(@Parameter(description = "The user message to stream", example = "Tell me a short joke")
+                             @RequestParam String message) {
         SseEmitter emitter = new SseEmitter(60_000L);
         streamingService.stream(message, new ChatStreamingService.StreamConsumer() {
             @Override
