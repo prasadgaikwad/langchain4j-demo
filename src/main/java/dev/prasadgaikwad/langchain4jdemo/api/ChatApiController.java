@@ -1,5 +1,6 @@
 package dev.prasadgaikwad.langchain4jdemo.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
@@ -27,15 +28,18 @@ public class ChatApiController {
     private final QaService qaService;
     private final ChainService chainService;
     private final ChatStreamingService streamingService;
+    private final ObjectMapper objectMapper;
 
     public ChatApiController(Assistant assistant,
                              QaService qaService,
                              ChainService chainService,
-                             ChatStreamingService streamingService) {
+                             ChatStreamingService streamingService,
+                             ObjectMapper objectMapper) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chainService = chainService;
         this.streamingService = streamingService;
+        this.objectMapper = objectMapper;
     }
 
     @PostMapping("/chat")
@@ -57,7 +61,10 @@ public class ChatApiController {
     }
 
     /**
-     * Streams the chat reply as Server-Sent Events, one event per token.
+     * Streams the chat reply as Server-Sent Events, one event per token. Each
+     * token is sent JSON-encoded so whitespace survives: the browser strips a
+     * leading space from a plain {@code data: } line, which would otherwise
+     * silently drop spaces between words.
      */
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@RequestParam String message) {
@@ -81,9 +88,9 @@ public class ChatApiController {
         return emitter;
     }
 
-    private static void send(SseEmitter emitter, String data) {
+    private void send(SseEmitter emitter, String token) {
         try {
-            emitter.send(SseEmitter.event().data(data));
+            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(token)));
         } catch (IOException e) {
             emitter.completeWithError(e);
         }

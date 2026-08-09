@@ -39,7 +39,7 @@
         const message = encodeURIComponent(document.getElementById('sse-input').value);
         sseOutput.textContent = '';
         const source = new EventSource('/api/chat/stream?message=' + message);
-        source.onmessage = (event) => { sseOutput.textContent += event.data; };
+        source.onmessage = (event) => { sseOutput.textContent += JSON.parse(event.data); };
         source.onerror = () => source.close();
     }
 

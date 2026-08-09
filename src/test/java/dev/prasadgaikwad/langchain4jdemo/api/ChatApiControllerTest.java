@@ -93,9 +93,10 @@ class ChatApiControllerTest {
     void streamEmitsTokensAsServerSentEvents() throws Exception {
         doAnswer(invocation -> {
             ChatStreamingService.StreamConsumer consumer = invocation.getArgument(1);
-            consumer.onToken("Hel");
-            consumer.onToken("lo");
-            consumer.onComplete("Hello");
+            consumer.onToken("Why");
+            consumer.onToken(" ");
+            consumer.onToken("not");
+            consumer.onComplete("Why not");
             return null;
         }).when(streamingService).stream(anyString(), any());
 
@@ -106,7 +107,8 @@ class ChatApiControllerTest {
         mockMvc.perform(asyncDispatch(result))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("text/event-stream"))
-                .andExpect(content().string(containsString("Hel")))
-                .andExpect(content().string(containsString("lo")));
+                .andExpect(content().string(containsString("\"Why\"")))
+                .andExpect(content().string(containsString("\" \"")))
+                .andExpect(content().string(containsString("\"not\"")));
     }
 }
