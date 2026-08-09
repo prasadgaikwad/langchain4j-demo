@@ -43,6 +43,21 @@ class DevToolingTest {
     }
 
     @Test
+    void openApiDocsIncludeOperationAndSchemaDescriptions() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title").value("LangChain4j Demo API"))
+                .andExpect(jsonPath("$.tags[*].name", org.hamcrest.Matchers.hasItem("Chat")))
+                .andExpect(jsonPath("$.tags[*].name", org.hamcrest.Matchers.hasItem("Prompting")))
+                .andExpect(jsonPath("$.paths['/api/chat'].post.summary")
+                        .value("Chat with the memory-backed assistant"))
+                .andExpect(jsonPath("$.paths['/api/chat/stream'].get.parameters[0].name")
+                        .value("message"))
+                .andExpect(jsonPath("$.components.schemas.ChatRequest.properties.message.description")
+                        .value("The user message or task to run"));
+    }
+
+    @Test
     void swaggerUiIsServed() throws Exception {
         mockMvc.perform(get("/swagger-ui.html"))
                 .andExpect(status().is3xxRedirection());
