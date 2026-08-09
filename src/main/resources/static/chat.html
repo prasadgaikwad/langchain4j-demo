@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LangChain4j Demo - Streaming</title>
+    <style>
+        body { font-family: sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+        section { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; }
+        input { width: 60%; padding: .4rem; }
+        button { padding: .4rem .8rem; }
+        pre { background: #f6f6f6; padding: .75rem; min-height: 3rem; white-space: pre-wrap; border-radius: 4px; }
+        h1 { font-size: 1.4rem; }
+    </style>
+</head>
+<body>
+<h1>LangChain4j Demo - Streaming Integration</h1>
+
+<section>
+    <h2>Server-Sent Events (REST)</h2>
+    <input id="sse-input" placeholder="Your message" value="Tell me a short joke">
+    <button onclick="streamSse()">Stream</button>
+    <pre id="sse-output"></pre>
+</section>
+
+<section>
+    <h2>WebSocket</h2>
+    <input id="ws-input" placeholder="Your message" value="Explain RAG in two sentences">
+    <button onclick="connectWs()">Connect &amp; Stream</button>
+    <button onclick="ws.send(JSON.stringify({message: document.getElementById('ws-input').value}))">Send</button>
+    <pre id="ws-output"></pre>
+</section>
+
+<script>
+    const sseOutput = document.getElementById('sse-output');
+    const wsOutput = document.getElementById('ws-output');
+    let ws;
+
+    function streamSse() {
+        const message = encodeURIComponent(document.getElementById('sse-input').value);
+        sseOutput.textContent = '';
+        const source = new EventSource('/api/chat/stream?message=' + message);
+        source.onmessage = (event) => { sseOutput.textContent += JSON.parse(event.data); };
+        source.onerror = () => source.close();
+    }
+
+    function connectWs() {
+        wsOutput.textContent = '';
+        const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+        ws = new WebSocket(`${protocol}://${location.host}/ws/chat`);
+        ws.onopen = () => {
+            wsOutput.textContent += '[connected]\n';
+            ws.send(JSON.stringify({message: document.getElementById('ws-input').value}));
+        };
+        ws.onmessage = (event) => {
+            if (event.data === '[DONE]') {
+                wsOutput.textContent += '\n[done]';
+            } else {
+                wsOutput.textContent += event.data;
+            }
+        };
+        ws.onerror = (e) => { wsOutput.textContent += '\n[error] ' + e; };
+    }
+</script>
+</body>
+</html>

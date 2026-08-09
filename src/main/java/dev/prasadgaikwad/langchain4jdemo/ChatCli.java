@@ -5,6 +5,7 @@ import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
+import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
@@ -51,6 +52,7 @@ public class ChatCli implements CommandLineRunner {
     private final FewShotAssistant fewShotAssistant;
     private final MovieExtractor movieExtractor;
     private final TopicExtractor topicExtractor;
+    private final ConversationHistoryService historyService;
     private MemoryType currentMemoryType;
 
     public ChatCli(Assistant assistant,
@@ -62,7 +64,8 @@ public class ChatCli implements CommandLineRunner {
                    PromptService promptService,
                    FewShotAssistant fewShotAssistant,
                    MovieExtractor movieExtractor,
-                   TopicExtractor topicExtractor) {
+                   TopicExtractor topicExtractor,
+                   ConversationHistoryService historyService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chatMemoryRegistry = chatMemoryRegistry;
@@ -73,6 +76,7 @@ public class ChatCli implements CommandLineRunner {
         this.fewShotAssistant = fewShotAssistant;
         this.movieExtractor = movieExtractor;
         this.topicExtractor = topicExtractor;
+        this.historyService = historyService;
         this.currentMemoryType = MemoryType.MESSAGE_WINDOW;
     }
 
@@ -103,7 +107,10 @@ public class ChatCli implements CommandLineRunner {
                     continue;
                 }
 
-                String answer = assistant.chat(currentMemoryType.memoryId(CONVERSATION_ID), input);
+                String memoryId = currentMemoryType.memoryId(CONVERSATION_ID);
+                String answer = assistant.chat(memoryId, input);
+                historyService.record(memoryId, "user", input);
+                historyService.record(memoryId, "ai", answer);
                 System.out.println("AI  > " + answer);
                 System.out.println();
             }
@@ -239,7 +246,10 @@ public class ChatCli implements CommandLineRunner {
             return;
         }
 
-        String answer = qaService.ask(currentMemoryType.memoryId(CONVERSATION_ID), argument.trim());
+        String memoryId = currentMemoryType.memoryId(CONVERSATION_ID);
+        String answer = qaService.ask(memoryId, argument.trim());
+        historyService.record(memoryId, "user", argument.trim());
+        historyService.record(memoryId, "ai", answer);
         System.out.println("RAG > " + answer);
         System.out.println();
     }
@@ -381,6 +391,9 @@ public class ChatCli implements CommandLineRunner {
                   /store                      Show embedding store stats
                   /save [path]                Persist the embedding store
                   quit                        Exit the application
+
+                REST API and WebSocket streaming are also available:
+                see http://localhost:8080 and http://localhost:8080/chat.html
                 """.formatted(KNOWN_EMBEDDING_MODELS));
     }
 }
