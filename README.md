@@ -106,11 +106,14 @@ SSE + WebSocket chat client).
 | POST   | `/api/chat`           | Chat with the memory-backed assistant (`{message}`)      |
 | POST   | `/api/ask`            | RAG question over indexed documents (`{question}`)       |
 | POST   | `/api/agent`          | Delegate a task to the tool-using agent (`{task}`)       |
-| GET    | `/api/chat/stream`    | Stream a chat reply over Server-Sent Events (`?message=`)|
-| POST   | `/api/prompt/sentiment` | Sentiment classification (`{text}`)                    |
-| POST   | `/api/prompt/movie`   | Extract structured movie data (`{text}`)                 |
-| POST   | `/api/prompt/topics`  | Extract a topic list (`{text}`)                          |
+| GET    | `/api/chat/stream`    | Stream a chat reply over Server-Sent Events (`?message=`; each token is a JSON string) |
+| POST   | `/api/sentiment`      | Sentiment classification (`{text}`)                      |
+| POST   | `/api/movie`          | Extract structured movie data (`{text}`)                 |
+| POST   | `/api/topics`         | Extract a topic list (`{text}`)                          |
+| GET    | `/api/template`       | Render a prompt template (`?movie=`)                     |
 | GET    | `/api/search`         | Semantic search over indexed documents (`?query=`)       |
+| POST   | `/api/index`          | Index a text (`{text}`)                                  |
+| GET    | `/api/store`          | Embedding store stats                                    |
 | GET    | `/api/history`        | List all conversations                                   |
 | GET    | `/api/history/{id}`   | Fetch the message history of one conversation            |
 | DELETE | `/api/history/{id}`   | Delete a conversation's history                          |
@@ -120,6 +123,15 @@ Conversation history is persisted in an in-memory H2 database via Spring Data
 JPA (`spring.datasource.*` below); the H2 console is available at
 http://localhost:8080/h2-console.
 
+## Developer Tooling
+
+- **Spring Boot DevTools** — automatic restart on code changes while developing
+  (`spring-boot-devtools`, runtime scope)
+- **Actuator** — monitoring endpoints at `/actuator/health`, `/actuator/info`,
+  and `/actuator/metrics`; `info.app.*` provides the application metadata
+- **Swagger UI** — browse and test every endpoint from the browser at
+  http://localhost:8080/swagger-ui.html (OpenAPI JSON at `/v3/api-docs`)
+
 ## Experiments Completed
 1. **Memory and Context** — conversation memory with `@MemoryId`, switchable between `message-window` and `token-window` types
 2. **Embeddings** — embedding generation, semantic search, switchable embedding models
@@ -128,6 +140,7 @@ http://localhost:8080/h2-console.
 5. **Chains and Agents** — custom processing chain, specialized tool-using agent, `@Tool` implementations
 6. **Prompting Techniques** — prompt templates, few-shot learning examples, output parsers / structured output
 7. **Integration Features** — REST API, streaming (SSE), WebSocket chat, database-backed history (H2 + Spring Data JPA)
+8. **Developer Tooling** — Spring Boot DevTools auto-restart, Actuator monitoring, Swagger UI for API testing
 
 ## Future Experiments and Features to Try
 
@@ -169,6 +182,9 @@ http://localhost:8080/h2-console.
 | `spring.datasource.url`    | `jdbc:h2:mem:demo;DB_CLOSE_DELAY=-1` | JDBC URL for conversation history |
 | `spring.jpa.hibernate.ddl-auto` | `create-drop`       | Hibernate schema generation for history     |
 | `spring.h2.console.enabled` | `true`                  | Enable the H2 web console                   |
+| `management.endpoints.web.exposure.include` | `health,info,metrics` | Exposed actuator endpoints |
+| `management.endpoint.health.show-details` | `always`      | Include health component details            |
+| `management.info.env.enabled` | `true`                | Expose `info.*` properties via `/actuator/info` |
 
 ## Current Dependency Versions
 - Spring Boot 3.5.7
@@ -176,6 +192,7 @@ http://localhost:8080/h2-console.
 - `langchain4j` and `langchain4j-open-ai` from the BOM
 - `langchain4j-document-parser-apache-pdfbox` for PDF parsing
 - `spring-boot-starter-web`, `spring-boot-starter-websocket`, `spring-boot-starter-data-jpa`, and H2 for the REST/streaming/WebSocket/DB integration
+- `spring-boot-devtools`, `spring-boot-starter-actuator`, and `springdoc-openapi-starter-webmvc-ui` (2.9.0) for developer tooling
 
 ## Dependencies
 - Spring Boot
