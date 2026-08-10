@@ -52,6 +52,10 @@ LangChain4j is a Java framework that simplifies the development of applications 
   - Streaming responses via Server-Sent Events (`/api/chat/stream`)
   - WebSocket streaming chat at `/ws/chat`
   - Database-backed conversation history (H2 via Spring Data JPA)
+- Evaluation and testing:
+  - Golden datasets (RAG, chat, sentiment) scored automatically
+  - Metrics: exact match, containment, token F1, ROUGE-L, embedding similarity, LLM-as-a-judge
+  - `/eval [rag|chat|sentiment]` prints a per-question and averaged report
 
 ## Running the Demo
 1. Set your API key: `export OPENAI_API_KEY=...` (or configure `application.properties`)
@@ -78,6 +82,7 @@ LangChain4j is a Java framework that simplifies the development of applications 
 /model <name>               Switch embedding model
 /store                      Show embedding store stats
 /save [path]                Persist the embedding store
+/eval [rag|chat|sentiment]  Run evaluation metrics over a golden dataset
 quit                        Exit the application
 ```
 
@@ -144,23 +149,19 @@ every conversation held through the REST API.
 6. **Prompting Techniques** — prompt templates, few-shot learning examples, output parsers / structured output
 7. **Integration Features** — REST API, streaming (SSE), WebSocket chat, database-backed history (H2 + Spring Data JPA)
 8. **Developer Tooling** — Spring Boot DevTools auto-restart, Actuator monitoring, Swagger UI for API testing
+9. **Evaluation and Testing** — golden datasets, offline metrics (exact match, containment, F1, ROUGE-L, embedding similarity, LLM-as-a-judge), `/eval` CLI command
 
 ## Future Experiments and Features to Try
 
-1. **LLM Integration**
+1. **Advanced Features**
+   - Multi-modal capabilities
+   - Function calling
+   - Advanced agent orchestration (LangChain4j `agentic` module)
+
+2. **LLM Integration**
    - Connect with different LLM providers (Anthropic, Google, local models via Ollama)
    - Experiment with different models (GPT-4, Claude)
    - Compare performance and capabilities
-
-2. **Evaluation and Testing**
-   - Implement evaluation metrics
-   - Create test suites for LLM responses
-   - Benchmark different approaches
-
-3. **Advanced Features**
-   - Multi-modal capabilities
-   - Structured output formatting
-   - Advanced agent orchestration (LangChain4j `agentic` module)
 
 ## Getting Started
 1. Clone the repository

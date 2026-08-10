@@ -9,6 +9,11 @@ import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
+import dev.prasadgaikwad.langchain4jdemo.evaluation.AnswerProvider;
+import dev.prasadgaikwad.langchain4jdemo.evaluation.EvaluationReport;
+import dev.prasadgaikwad.langchain4jdemo.evaluation.EvaluationReportItem;
+import dev.prasadgaikwad.langchain4jdemo.evaluation.EvaluationService;
+import dev.prasadgaikwad.langchain4jdemo.evaluation.GoldenDataset;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
 import dev.prasadgaikwad.langchain4jdemo.prompt.FewShotAssistant;
@@ -53,6 +58,7 @@ public class ChatCli implements CommandLineRunner {
     private final MovieExtractor movieExtractor;
     private final TopicExtractor topicExtractor;
     private final ConversationHistoryService historyService;
+    private final EvaluationService evaluationService;
     private MemoryType currentMemoryType;
 
     public ChatCli(Assistant assistant,
@@ -65,7 +71,8 @@ public class ChatCli implements CommandLineRunner {
                    FewShotAssistant fewShotAssistant,
                    MovieExtractor movieExtractor,
                    TopicExtractor topicExtractor,
-                   ConversationHistoryService historyService) {
+                   ConversationHistoryService historyService,
+                   EvaluationService evaluationService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chatMemoryRegistry = chatMemoryRegistry;
@@ -77,6 +84,7 @@ public class ChatCli implements CommandLineRunner {
         this.movieExtractor = movieExtractor;
         this.topicExtractor = topicExtractor;
         this.historyService = historyService;
+        this.evaluationService = evaluationService;
         this.currentMemoryType = MemoryType.MESSAGE_WINDOW;
     }
 
@@ -139,6 +147,7 @@ public class ChatCli implements CommandLineRunner {
             case "/model" -> handleModelCommand(argument);
             case "/store" -> printStoreStatus();
             case "/save" -> save(argument);
+            case "/eval" -> runEvaluation(argument);
             default -> System.out.println("Unknown command: " + command + " (try /help)");
         }
     }
@@ -351,6 +360,75 @@ public class ChatCli implements CommandLineRunner {
         }
     }
 
+    private void runEvaluation(String argument) {
+        String mode = argument != null && !argument.isBlank() ? argument.trim().toLowerCase(Locale.ROOT) : "rag";
+        String memoryId = currentMemoryType.memoryId(CONVERSATION_ID);
+
+        GoldenDataset dataset;
+        AnswerProvider provider;
+        switch (mode) {
+            case "rag" -> {
+                if (searchService.storeSize() == 0) {
+                    System.out.println("Embedding store is empty. Index some documents first with /index <file-or-directory>.");
+                    return;
+                }
+                dataset = GoldenDataset.rag();
+                provider = question -> qaService.ask(memoryId, question);
+            }
+            case "chat" -> {
+                dataset = GoldenDataset.chat();
+                provider = question -> assistant.chat(memoryId, question);
+            }
+            case "sentiment" -> {
+                dataset = GoldenDataset.sentiment();
+                provider = question -> fewShotAssistant.classify(question).name();
+            }
+            default -> {
+                System.out.println("Unknown evaluation: " + argument.trim()
+                        + " (use: rag | chat | sentiment)");
+                return;
+            }
+        }
+
+        System.out.println("Evaluating " + dataset.goldenQuestions().size() + " sample(s) on the '" + dataset.name()
+                + "' dataset...");
+        EvaluationReport report = evaluationService.evaluate(dataset, provider);
+        printEvaluationReport(report);
+    }
+
+    private void printEvaluationReport(EvaluationReport report) {
+        List<String> metricNames = report.items().isEmpty()
+                ? report.averageScores().keySet().stream().toList()
+                : report.items().get(0).scores().keySet().stream().toList();
+
+        System.out.println();
+        System.out.println("=== Evaluation: " + report.dataset() + " ===");
+        System.out.println("Metrics: " + String.join(", ", metricNames));
+        System.out.println();
+        for (int i = 0; i < report.items().size(); i++) {
+            EvaluationReportItem item = report.items().get(i);
+            System.out.printf("[%d] %s%n", i + 1, item.question());
+            System.out.println("    Expected: " + item.expected());
+            System.out.println("    Actual  : " + item.actual());
+            System.out.println("    Scores  : " + formatScores(item.scores(), metricNames));
+        }
+        System.out.println();
+        System.out.println("Average: " + formatScores(report.averageScores(), metricNames));
+        System.out.println();
+    }
+
+    private String formatScores(java.util.Map<String, Double> scores, List<String> metricNames) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < metricNames.size(); i++) {
+            if (i > 0) {
+                sb.append("  ");
+            }
+            sb.append(String.format(Locale.ROOT, "%s=%.2f", metricNames.get(i),
+                    scores.getOrDefault(metricNames.get(i), 0.0)));
+        }
+        return sb.toString();
+    }
+
     private String shortPreview(float[] vector) {
         StringBuilder sb = new StringBuilder("[");
         int preview = Math.min(8, vector.length);
@@ -390,6 +468,7 @@ public class ChatCli implements CommandLineRunner {
                   /model <name>               Switch embedding model (%s)
                   /store                      Show embedding store stats
                   /save [path]                Persist the embedding store
+                  /eval [rag|chat|sentiment]  Run evaluation metrics over a golden dataset
                   quit                        Exit the application
 
                 REST API and WebSocket streaming are also available:
