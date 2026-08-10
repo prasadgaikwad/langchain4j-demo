@@ -3,6 +3,7 @@ package dev.prasadgaikwad.langchain4jdemo.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
+import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,50 +36,59 @@ public class ChatApiController {
     private final QaService qaService;
     private final ChainService chainService;
     private final ChatStreamingService streamingService;
+    private final ConversationHistoryService historyService;
     private final ObjectMapper objectMapper;
 
     public ChatApiController(Assistant assistant,
                              QaService qaService,
                              ChainService chainService,
                              ChatStreamingService streamingService,
+                             ConversationHistoryService historyService,
                              ObjectMapper objectMapper) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chainService = chainService;
         this.streamingService = streamingService;
+        this.historyService = historyService;
         this.objectMapper = objectMapper;
     }
 
     @PostMapping("/chat")
     @Operation(summary = "Chat with the memory-backed assistant",
             description = "Sends the message to the assistant with conversation memory. "
-                    + "Use a conversationId to keep a multi-turn conversation; a new id starts fresh.")
+                    + "Use a conversationId to keep a multi-turn conversation; a new id starts fresh. "
+                    + "Each turn is persisted to the conversation history.")
     @ApiResponse(responseCode = "200", description = "The assistant's answer",
             content = @Content(schema = @Schema(implementation = ChatResponse.class)))
     public ChatResponse chat(@RequestBody ChatRequest request) {
         String answer = assistant.chat(request.conversationId(), request.message());
+        recordTurn(request.conversationId(), request.message(), answer);
         return new ChatResponse(answer);
     }
 
     @PostMapping("/ask")
     @Operation(summary = "Ask a question over indexed documents (RAG)",
             description = "Answers the question using the most relevant chunks from the "
-                    + "embedding store via a RetrievalAugmentor.")
+                    + "embedding store via a RetrievalAugmentor. The question and answer are "
+                    + "persisted to the conversation history.")
     @ApiResponse(responseCode = "200", description = "The answer grounded in the indexed documents",
             content = @Content(schema = @Schema(implementation = ChatResponse.class)))
     public ChatResponse ask(@RequestBody ChatRequest request) {
         String answer = qaService.ask(request.conversationId(), request.message());
+        recordTurn(request.conversationId(), request.message(), answer);
         return new ChatResponse(answer);
     }
 
     @PostMapping("/agent")
     @Operation(summary = "Delegate a task to the tool-using agent",
             description = "Runs the task through the custom chain, routing arithmetic to a local "
-                    + "calculator and everything else to the tool-using agent (search, store stats).")
+                    + "calculator and everything else to the tool-using agent (search, store stats). "
+                    + "The task and result are persisted to the conversation history.")
     @ApiResponse(responseCode = "200", description = "The agent's result",
             content = @Content(schema = @Schema(implementation = ChatResponse.class)))
     public ChatResponse agent(@RequestBody ChatRequest request) {
         String answer = chainService.ask(request.conversationId(), request.message());
+        recordTurn(request.conversationId(), request.message(), answer);
         return new ChatResponse(answer);
     }
 
@@ -91,10 +101,14 @@ public class ChatApiController {
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Stream a chat reply token by token (SSE)",
             description = "Returns a text/event-stream where every event is a JSON-encoded token. "
-                    + "Each token is JSON-encoded so spaces between words survive the SSE transport.")
+                    + "Each token is JSON-encoded so spaces between words survive the SSE transport. "
+                    + "The message and the complete reply are persisted to the conversation history.")
     @ApiResponse(responseCode = "200", description = "A stream of JSON-encoded tokens")
     public SseEmitter stream(@Parameter(description = "The user message to stream", example = "Tell me a short joke")
-                             @RequestParam String message) {
+                             @RequestParam String message,
+            @Parameter(description = "Conversation (memory) id", example = "web",
+                    schema = @Schema(defaultValue = "api"))
+            @RequestParam(defaultValue = "api") String conversationId) {
         SseEmitter emitter = new SseEmitter(60_000L);
         streamingService.stream(message, new ChatStreamingService.StreamConsumer() {
             @Override
@@ -104,6 +118,7 @@ public class ChatApiController {
 
             @Override
             public void onComplete(String fullText) {
+                recordTurn(conversationId, message, fullText);
                 emitter.complete();
             }
 
@@ -113,6 +128,11 @@ public class ChatApiController {
             }
         });
         return emitter;
+    }
+
+    private void recordTurn(String conversationId, String userMessage, String aiAnswer) {
+        historyService.record(conversationId, "user", userMessage);
+        historyService.record(conversationId, "ai", aiAnswer);
     }
 
     private void send(SseEmitter emitter, String token) {

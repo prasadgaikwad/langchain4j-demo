@@ -2,6 +2,7 @@ package dev.prasadgaikwad.langchain4jdemo.api;
 
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
+import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,9 @@ class ChatApiControllerTest {
     @MockitoBean
     ChatStreamingService streamingService;
 
+    @Autowired
+    ConversationHistoryService historyService;
+
     @Test
     void chatReturnsTheAssistantAnswer() throws Exception {
         when(assistant.chat(anyString(), anyString())).thenReturn("Hello from the API!");
@@ -53,6 +57,24 @@ class ChatApiControllerTest {
                         .content("{\"message\":\"hi\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer").value("Hello from the API!"));
+    }
+
+    @Test
+    void chatPersistsTheConversationHistory() throws Exception {
+        when(assistant.chat(anyString(), anyString())).thenReturn("Answer one");
+
+        mockMvc.perform(post("/api/chat")
+                        .contentType("application/json")
+                        .content("{\"conversationId\":\"hist-chat\",\"message\":\"hello db\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/history/hist-chat"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].role").value("user"))
+                .andExpect(jsonPath("$[0].text").value("hello db"))
+                .andExpect(jsonPath("$[1].role").value("ai"))
+                .andExpect(jsonPath("$[1].text").value("Answer one"));
     }
 
     @Test
@@ -73,9 +95,15 @@ class ChatApiControllerTest {
 
         mockMvc.perform(post("/api/ask")
                         .contentType("application/json")
-                        .content("{\"message\":\"what is RAG?\"}"))
+                        .content("{\"conversationId\":\"hist-ask\",\"message\":\"what is RAG?\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer").value("Answer from documents"));
+
+        mockMvc.perform(get("/api/history/hist-ask"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[1].role").value("ai"))
+                .andExpect(jsonPath("$[1].text").value("Answer from documents"));
     }
 
     @Test
@@ -84,9 +112,15 @@ class ChatApiControllerTest {
 
         mockMvc.perform(post("/api/agent")
                         .contentType("application/json")
-                        .content("{\"message\":\"summarize\"}"))
+                        .content("{\"conversationId\":\"hist-agent\",\"message\":\"summarize\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer").value("Task done"));
+
+        mockMvc.perform(get("/api/history/hist-agent"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].text").value("summarize"))
+                .andExpect(jsonPath("$[1].text").value("Task done"));
     }
 
     @Test
@@ -110,5 +144,36 @@ class ChatApiControllerTest {
                 .andExpect(content().string(containsString("\"Why\"")))
                 .andExpect(content().string(containsString("\" \"")))
                 .andExpect(content().string(containsString("\"not\"")));
+
+        mockMvc.perform(get("/api/history/api"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].text").value("hi"))
+                .andExpect(jsonPath("$[1].text").value("Why not"));
+    }
+
+    @Test
+    void streamRecordsUnderTheProvidedConversationId() throws Exception {
+        doAnswer(invocation -> {
+            ChatStreamingService.StreamConsumer consumer = invocation.getArgument(1);
+            consumer.onToken("ok");
+            consumer.onComplete("ok");
+            return null;
+        }).when(streamingService).stream(anyString(), any());
+
+        MvcResult result = mockMvc.perform(get("/api/chat/stream")
+                        .param("message", "hello")
+                        .param("conversationId", "hist-stream"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(result))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/history/hist-stream"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].text").value("hello"))
+                .andExpect(jsonPath("$[1].text").value("ok"));
     }
 }

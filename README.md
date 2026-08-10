@@ -106,7 +106,7 @@ SSE + WebSocket chat client).
 | POST   | `/api/chat`           | Chat with the memory-backed assistant (`{message}`)      |
 | POST   | `/api/ask`            | RAG question over indexed documents (`{question}`)       |
 | POST   | `/api/agent`          | Delegate a task to the tool-using agent (`{task}`)       |
-| GET    | `/api/chat/stream`    | Stream a chat reply over Server-Sent Events (`?message=`; each token is a JSON string) |
+| GET    | `/api/chat/stream`    | Stream a chat reply over Server-Sent Events (`?message=&conversationId=`; each token is a JSON string) |
 | POST   | `/api/sentiment`      | Sentiment classification (`{text}`)                      |
 | POST   | `/api/movie`          | Extract structured movie data (`{text}`)                 |
 | POST   | `/api/topics`         | Extract a topic list (`{text}`)                          |
@@ -121,7 +121,10 @@ SSE + WebSocket chat client).
 
 Conversation history is persisted in an in-memory H2 database via Spring Data
 JPA (`spring.datasource.*` below); the H2 console is available at
-http://localhost:8080/h2-console.
+http://localhost:8080/h2-console. `/api/chat`, `/api/ask`, `/api/agent`, and
+`/api/chat/stream` automatically record each user message and AI answer under
+the request's `conversationId` (default `api`), so `/api/history/{id}` reflects
+every conversation held through the REST API.
 
 ## Developer Tooling
 
