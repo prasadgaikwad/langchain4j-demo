@@ -56,6 +56,11 @@ LangChain4j is a Java framework that simplifies the development of applications 
   - Golden datasets (RAG, chat, sentiment) scored automatically
   - Metrics: exact match, containment, token F1, ROUGE-L, embedding similarity, LLM-as-a-judge
   - `/eval [rag|chat|sentiment]` prints a per-question and averaged report
+- Advanced features:
+  - Multi-modal: vision (describe an image by URL or base64), image generation (`gpt-image-1`), speech-to-text (`whisper-1`)
+  - Function calling: custom tools with structured parameters (record + enum) and conversation-scoped state (`@ToolMemoryId`)
+  - Dynamic tool selection: a `ToolProvider` exposes tools per request based on the task
+  - Structured output at the model level: JSON schema response format constrains the reply to a record's schema
 
 ## Running the Demo
 1. Set your API key: `export OPENAI_API_KEY=...` (or configure `application.properties`)
@@ -71,6 +76,11 @@ LangChain4j is a Java framework that simplifies the development of applications 
 /search <query>             Semantic search over the indexed documents
 /ask <question>             Answer the question using the indexed documents (RAG)
 /agent <task>               Execute a task with the tool-using agent
+/dynamic <task>             Execute a task with dynamically selected tools
+/describe <url> [question]  Ask a multimodal model about an image
+/generate <prompt>          Generate an image from a text prompt
+/transcribe <file>          Transcribe an audio file to text
+/schema <text>              Extract structured data via JSON schema
 /template [movie]           Render a prompt template (no API call)
 /sentiment <text>           Classify sentiment with few-shot examples
 /movie <text>               Extract structured movie data (output parser)
@@ -115,6 +125,7 @@ SSE + WebSocket chat client).
 | POST   | `/api/sentiment`      | Sentiment classification (`{text}`)                      |
 | POST   | `/api/movie`          | Extract structured movie data (`{text}`)                 |
 | POST   | `/api/topics`         | Extract a topic list (`{text}`)                          |
+| POST   | `/api/describe`       | Describe an image by URL or base64 (`{imageUrl|imageData, mimeType, question}`) |
 | GET    | `/api/template`       | Render a prompt template (`?movie=`)                     |
 | GET    | `/api/search`         | Semantic search over indexed documents (`?query=`)       |
 | POST   | `/api/index`          | Index a text (`{text}`)                                  |
@@ -150,18 +161,18 @@ every conversation held through the REST API.
 7. **Integration Features** — REST API, streaming (SSE), WebSocket chat, database-backed history (H2 + Spring Data JPA)
 8. **Developer Tooling** — Spring Boot DevTools auto-restart, Actuator monitoring, Swagger UI for API testing
 9. **Evaluation and Testing** — golden datasets, offline metrics (exact match, containment, F1, ROUGE-L, embedding similarity, LLM-as-a-judge), `/eval` CLI command
+10. **Advanced Features** — multi-modal (vision, image generation, speech-to-text), function calling with structured tool parameters and dynamic `ToolProvider`, JSON-schema structured output
 
 ## Future Experiments and Features to Try
 
-1. **Advanced Features**
-   - Multi-modal capabilities
-   - Function calling
-   - Advanced agent orchestration (LangChain4j `agentic` module)
-
-2. **LLM Integration**
+1. **LLM Integration**
    - Connect with different LLM providers (Anthropic, Google, local models via Ollama)
    - Experiment with different models (GPT-4, Claude)
    - Compare performance and capabilities
+
+2. **Advanced Orchestration**
+   - Advanced agent orchestration (LangChain4j `agentic` module)
+   - Streaming function calling
 
 ## Getting Started
 1. Clone the repository
@@ -180,6 +191,8 @@ every conversation held through the REST API.
 | `app.embedding.store-path`  | `embedding-store.json`  | JSON file for persisting the embedding store |
 | `app.embedding.max-results` | `5`                     | Default number of search results             |
 | `app.rag.max-results`       | `5`                     | Chunks retrieved for each RAG question       |
+| `app.image.model-name`      | `gpt-image-1`           | OpenAI model used for image generation       |
+| `app.stt.model-name`        | `whisper-1`             | OpenAI model used for speech-to-text         |
 | `app.document.splitter`     | `recursive`             | Document text splitting strategy             |
 | `app.document.max-chunk-size` | `200`                 | Max chunk size in characters                 |
 | `app.document.max-overlap`  | `20`                    | Overlap between consecutive chunks           |

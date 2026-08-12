@@ -4,6 +4,7 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
+import dev.prasadgaikwad.langchain4jdemo.ai.DynamicAgent;
 import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
 import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentService;
@@ -16,6 +17,9 @@ import dev.prasadgaikwad.langchain4jdemo.evaluation.EvaluationService;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.GoldenDataset;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
+import dev.prasadgaikwad.langchain4jdemo.multimodal.ImageGenerationService;
+import dev.prasadgaikwad.langchain4jdemo.multimodal.SpeechToTextService;
+import dev.prasadgaikwad.langchain4jdemo.multimodal.VisionService;
 import dev.prasadgaikwad.langchain4jdemo.prompt.FewShotAssistant;
 import dev.prasadgaikwad.langchain4jdemo.prompt.MovieExtractor;
 import dev.prasadgaikwad.langchain4jdemo.prompt.MovieReview;
@@ -23,6 +27,7 @@ import dev.prasadgaikwad.langchain4jdemo.prompt.PromptService;
 import dev.prasadgaikwad.langchain4jdemo.prompt.Sentiment;
 import dev.prasadgaikwad.langchain4jdemo.prompt.TopicExtractor;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
+import dev.prasadgaikwad.langchain4jdemo.structured.JsonSchemaExtractionService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -59,6 +64,11 @@ public class ChatCli implements CommandLineRunner {
     private final TopicExtractor topicExtractor;
     private final ConversationHistoryService historyService;
     private final EvaluationService evaluationService;
+    private final VisionService visionService;
+    private final ImageGenerationService imageGenerationService;
+    private final SpeechToTextService speechToTextService;
+    private final DynamicAgent dynamicAgent;
+    private final JsonSchemaExtractionService jsonSchemaExtractionService;
     private MemoryType currentMemoryType;
 
     public ChatCli(Assistant assistant,
@@ -72,7 +82,12 @@ public class ChatCli implements CommandLineRunner {
                    MovieExtractor movieExtractor,
                    TopicExtractor topicExtractor,
                    ConversationHistoryService historyService,
-                   EvaluationService evaluationService) {
+                   EvaluationService evaluationService,
+                   VisionService visionService,
+                   ImageGenerationService imageGenerationService,
+                   SpeechToTextService speechToTextService,
+                   DynamicAgent dynamicAgent,
+                   JsonSchemaExtractionService jsonSchemaExtractionService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chatMemoryRegistry = chatMemoryRegistry;
@@ -85,6 +100,11 @@ public class ChatCli implements CommandLineRunner {
         this.topicExtractor = topicExtractor;
         this.historyService = historyService;
         this.evaluationService = evaluationService;
+        this.visionService = visionService;
+        this.imageGenerationService = imageGenerationService;
+        this.speechToTextService = speechToTextService;
+        this.dynamicAgent = dynamicAgent;
+        this.jsonSchemaExtractionService = jsonSchemaExtractionService;
         this.currentMemoryType = MemoryType.MESSAGE_WINDOW;
     }
 
@@ -138,6 +158,11 @@ public class ChatCli implements CommandLineRunner {
             case "/search" -> search(argument);
             case "/ask" -> ask(argument);
             case "/agent" -> runAgent(argument);
+            case "/dynamic" -> runDynamicAgent(argument);
+            case "/describe" -> describeImage(argument);
+            case "/generate" -> generateImage(argument);
+            case "/transcribe" -> transcribeAudio(argument);
+            case "/schema" -> extractWithSchema(argument);
             case "/template" -> showTemplate(argument);
             case "/sentiment" -> classifySentiment(argument);
             case "/movie" -> extractMovie(argument);
@@ -272,6 +297,99 @@ public class ChatCli implements CommandLineRunner {
         String answer = chainService.ask(currentMemoryType.memoryId(CONVERSATION_ID), argument.trim());
         System.out.println("Agent > " + answer);
         System.out.println();
+    }
+
+    private void runDynamicAgent(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /dynamic <task>");
+            return;
+        }
+
+        String answer = dynamicAgent.execute(currentMemoryType.memoryId(CONVERSATION_ID), argument.trim());
+        System.out.println("Agent > " + answer);
+        System.out.println();
+    }
+
+    private void describeImage(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /describe <image-url> [question]");
+            return;
+        }
+
+        String[] parts = argument.trim().split("\\s+", 2);
+        String imageUrl = parts[0];
+        String question = parts.length > 1 ? parts[1] : "Describe this image in one sentence.";
+        String answer = visionService.describeImage(imageUrl, question);
+        System.out.println("Vision > " + answer);
+        System.out.println();
+    }
+
+    private void generateImage(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /generate <prompt>");
+            return;
+        }
+
+        dev.langchain4j.data.image.Image image = imageGenerationService.generate(argument.trim());
+        System.out.println("Image > " + describeImageResult(image));
+        System.out.println();
+    }
+
+    private void transcribeAudio(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /transcribe <audio-file>");
+            return;
+        }
+
+        Path path = Path.of(argument.trim());
+        if (!Files.isRegularFile(path)) {
+            System.out.println("File not found: " + path);
+            return;
+        }
+        try {
+            String mimeType = mimeTypeFor(path);
+            byte[] bytes = Files.readAllBytes(path);
+            String text = speechToTextService.transcribe(bytes, mimeType);
+            System.out.println("Transcription > " + text);
+        } catch (Exception e) {
+            System.out.println("Transcription failed: " + e.getMessage());
+        }
+        System.out.println();
+    }
+
+    private void extractWithSchema(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /schema <text>");
+            return;
+        }
+
+        MovieReview review = jsonSchemaExtractionService.extractMovie(argument.trim());
+        System.out.println("JSON schema > " + review);
+        System.out.println();
+    }
+
+    private static String mimeTypeFor(Path path) {
+        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        if (name.endsWith(".mp3")) {
+            return "audio/mpeg";
+        }
+        if (name.endsWith(".ogg")) {
+            return "audio/ogg";
+        }
+        if (name.endsWith(".m4a")) {
+            return "audio/mp4";
+        }
+        return "audio/wav";
+    }
+
+    private static String describeImageResult(dev.langchain4j.data.image.Image image) {
+        if (image.url() != null) {
+            return "generated: " + image.url();
+        }
+        if (image.base64Data() != null) {
+            return "generated " + image.mimeType() + " image (" + image.base64Data().length() + " base64 chars)";
+        }
+        return "generated image (no URL or data returned)";
     }
 
     private void showTemplate(String argument) {
@@ -457,6 +575,11 @@ public class ChatCli implements CommandLineRunner {
                   /search <query>             Semantic search over the indexed documents
                   /ask <question>             Answer the question using the indexed documents (RAG)
                   /agent <task>               Execute a task with the tool-using agent
+                  /dynamic <task>             Execute a task with dynamically selected tools
+                  /describe <url> [question]  Ask a multimodal model about an image
+                  /generate <prompt>          Generate an image from a text prompt
+                  /transcribe <file>          Transcribe an audio file to text
+                  /schema <text>              Extract structured data via JSON schema
                   /template [movie]           Render a prompt template (no API call)
                   /sentiment <text>           Classify sentiment with few-shot examples
                   /movie <text>               Extract structured movie data (output parser)
