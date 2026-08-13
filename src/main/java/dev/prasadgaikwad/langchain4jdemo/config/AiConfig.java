@@ -10,7 +10,6 @@ import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.image.ImageModel;
 import dev.langchain4j.model.openai.OpenAiAudioTranscriptionModel;
-import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiImageModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
@@ -28,6 +27,7 @@ import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.ai.DynamicAgent;
 import dev.prasadgaikwad.langchain4jdemo.ai.QaAssistant;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
+import dev.prasadgaikwad.langchain4jdemo.llm.ModelRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
 import dev.prasadgaikwad.langchain4jdemo.prompt.FewShotAssistant;
@@ -43,17 +43,11 @@ import java.util.function.Function;
 @Configuration
 public class AiConfig {
 
-    @Bean
-    public ChatModel chatModel(@Value("${app.chat.model-name:gpt-4o-mini}") String modelName) {
-        return OpenAiChatModel.builder()
-                .apiKey(System.getenv("OPENAI_API_KEY"))
-                .modelName(modelName)
-                .build();
-    }
-
     /**
-     * Streaming variant of the chat model, used by the SSE and WebSocket
-     * endpoints to forward tokens as they are generated.
+     * The chat model used by every AI service is the {@code ModelRegistry}:
+     * switching the registry's provider/model selection switches all services
+     * (assistant, RAG, agent, few-shot, judge) at runtime. The registry is the
+     * only {@code ChatModel} bean, so services autowire it by type.
      */
     @Bean
     public StreamingChatModel streamingChatModel(@Value("${app.chat.model-name:gpt-4o-mini}") String modelName) {
