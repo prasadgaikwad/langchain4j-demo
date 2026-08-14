@@ -1,7 +1,11 @@
 package dev.prasadgaikwad.langchain4jdemo.llm;
 
+import dev.langchain4j.model.ModelProvider;
+import dev.langchain4j.model.chat.Capability;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.listener.ChatModelListener;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
@@ -15,6 +19,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -148,6 +153,33 @@ public class ModelRegistry implements ChatModel {
     @Override
     public ChatResponse doChat(ChatRequest chatRequest) {
         return currentChatModel().doChat(chatRequest);
+    }
+
+    /**
+     * The interface default returns {@code DefaultChatRequestParameters}, which
+     * provider models cannot process: {@code OpenAiChatModel} casts the merged
+     * parameters to {@code OpenAiChatRequestParameters} in {@code doChat}.
+     * Delegating to the current model makes every request carry the provider's
+     * own parameters.
+     */
+    @Override
+    public ChatRequestParameters defaultRequestParameters() {
+        return currentChatModel().defaultRequestParameters();
+    }
+
+    @Override
+    public Set<Capability> supportedCapabilities() {
+        return currentChatModel().supportedCapabilities();
+    }
+
+    @Override
+    public List<ChatModelListener> listeners() {
+        return currentChatModel().listeners();
+    }
+
+    @Override
+    public ModelProvider provider() {
+        return currentChatModel().provider();
     }
 
     private ChatModel buildChatModel(LlmProvider provider, String modelName) {
