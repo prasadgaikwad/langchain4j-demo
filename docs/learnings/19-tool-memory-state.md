@@ -32,8 +32,8 @@ public class NoteTool {
 ## Diagram
 ```mermaid
 flowchart LR
-    A[Assistant.chat\n@MemoryId=abc] --> T[NoteTool.saveNote\n@ToolMemoryId=abc]
-    B[Assistant.chat\n@MemoryId=xyz] --> T2[NoteTool.saveNote\n@ToolMemoryId=xyz]
+    A["Assistant.chat\n@MemoryId=abc"] --> T["NoteTool.saveNote\n@ToolMemoryId=abc"]
+    B["Assistant.chat\n@MemoryId=xyz"] --> T2["NoteTool.saveNote\n@ToolMemoryId=xyz"]
     T --> M1[(notes: abc)]
     T2 --> M2[(notes: xyz)]
 ```

@@ -39,9 +39,9 @@ private String describe(ImageContent image, String question) {
 ## Diagram
 ```mermaid
 flowchart LR
-    URL[image URL] --> IC[ImageContent.from(URI)]
-    B64[bytes + mime] --> IC2[ImageContent.from(base64, mime)]
-    IC --> MSG[UserMessage(text + image)]
+    URL[image URL] --> IC["ImageContent.from(URI)"]
+    B64[bytes + mime] --> IC2["ImageContent.from(base64, mime)"]
+    IC --> MSG["UserMessage(text + image)"]
     IC2 --> MSG
     MSG --> LLM[multimodal ChatModel]
     LLM --> DESC[text description]

@@ -30,7 +30,7 @@ List<ChatMessage> messages = List.of(
 ## Diagram
 ```mermaid
 flowchart LR
-    T[Template text\n{{movie}} {{year}} {{tone}}] --> P[PromptTemplate]
+    T["Template text\n{{movie}} {{year}} {{tone}}"] --> P[PromptTemplate]
     V[Map of values] --> P
     P -->|apply| PROMPT[Prompt]
     PROMPT -->|toSystemMessage| S[SystemMessage]

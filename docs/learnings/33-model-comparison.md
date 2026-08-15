@@ -37,7 +37,7 @@ public ComparisonReport compare(GoldenDataset dataset, AnswerProvider provider) 
 ```mermaid
 flowchart LR
     subgraph loop["for each available model"]
-        SET[registry.setModel(model)] --> EV[EvaluationService\nsame dataset + metrics]
+        SET["registry.setModel(model)"] --> EV["EvaluationService\nsame dataset + metrics"]
         EV --> ROW[ModelScore]
     end
     ROW --> REPORT[ComparisonReport]
