@@ -22,6 +22,8 @@ import dev.prasadgaikwad.langchain4jdemo.agent.CalculatorTool;
 import dev.prasadgaikwad.langchain4jdemo.agent.DocumentSearchTool;
 import dev.prasadgaikwad.langchain4jdemo.agent.DynamicToolProvider;
 import dev.prasadgaikwad.langchain4jdemo.agent.EmbeddingStoreStatsTool;
+import dev.prasadgaikwad.langchain4jdemo.agent.WeatherTool;
+import dev.prasadgaikwad.langchain4jdemo.agentic.CrewService;
 import dev.prasadgaikwad.langchain4jdemo.ai.Agent;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.ai.DynamicAgent;
@@ -34,6 +36,7 @@ import dev.prasadgaikwad.langchain4jdemo.prompt.FewShotAssistant;
 import dev.prasadgaikwad.langchain4jdemo.prompt.MovieExtractor;
 import dev.prasadgaikwad.langchain4jdemo.prompt.TopicExtractor;
 import dev.prasadgaikwad.langchain4jdemo.rag.SemanticSearchContentRetriever;
+import dev.prasadgaikwad.langchain4jdemo.streaming.StreamingAgent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -54,6 +57,24 @@ public class AiConfig {
         return OpenAiStreamingChatModel.builder()
                 .apiKey(System.getenv("OPENAI_API_KEY"))
                 .modelName(modelName)
+                .build();
+    }
+
+    /**
+     * Streaming AI service that can also call {@code @Tool} methods while tokens
+     * are streamed back, demonstrating streaming function calling.
+     */
+    @Bean
+    public StreamingAgent streamingAgent(StreamingChatModel streamingChatModel,
+                                         ChatMemoryRegistry chatMemoryRegistry,
+                                         CalculatorTool calculatorTool,
+                                         @Value("${app.chat.model-name:gpt-4o-mini}") String modelName,
+                                         @Value("${app.memory.max-messages:10}") int maxMessages,
+                                         @Value("${app.memory.max-tokens:2000}") int maxTokens) {
+        return AiServices.builder(StreamingAgent.class)
+                .streamingChatModel(streamingChatModel)
+                .chatMemoryProvider(createChatMemoryProvider(chatMemoryRegistry, modelName, maxMessages, maxTokens))
+                .tools(calculatorTool)
                 .build();
     }
 
