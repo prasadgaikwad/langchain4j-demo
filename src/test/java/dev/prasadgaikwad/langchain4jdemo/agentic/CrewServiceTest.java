@@ -1,6 +1,9 @@
 package dev.prasadgaikwad.langchain4jdemo.agentic;
 
 import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.ChatMessageType;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -55,6 +58,20 @@ class CrewServiceTest {
         assertThat(subAgentRequest.toolSpecifications())
                 .extracting(spec -> spec.name())
                 .contains("getWeather");
+    }
+
+    @Test
+    void subAgentReceivesTheDelegatedTask() {
+        ScriptedSupervisorChatModel chatModel = new ScriptedSupervisorChatModel("Weather looks sunny.");
+        CrewService crew = crew(chatModel);
+
+        crew.run("What is the weather?");
+
+        ChatRequest subAgentRequest = chatModel.requests.get(1);
+        assertThat(subAgentRequest.messages())
+                .filteredOn(message -> message.type() == ChatMessageType.USER)
+                .anySatisfy(message ->
+                        assertThat(((UserMessage) message).singleText()).contains("weather report"));
     }
 
     /**

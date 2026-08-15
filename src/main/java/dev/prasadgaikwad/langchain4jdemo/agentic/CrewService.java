@@ -1,7 +1,6 @@
 package dev.prasadgaikwad.langchain4jdemo.agentic;
 
 import dev.langchain4j.agentic.AgenticServices;
-import dev.langchain4j.agentic.UntypedAgent;
 import dev.langchain4j.agentic.supervisor.SupervisorAgent;
 import dev.langchain4j.agentic.supervisor.SupervisorResponseStrategy;
 import dev.langchain4j.memory.ChatMemory;
@@ -13,8 +12,6 @@ import dev.prasadgaikwad.langchain4jdemo.agent.DocumentSearchTool;
 import dev.prasadgaikwad.langchain4jdemo.agent.WeatherTool;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import org.springframework.stereotype.Service;
-
-import java.util.Map;
 
 /**
  * A small multi-agent system built with the LangChain4j agentic module. A
@@ -45,21 +42,24 @@ public class CrewService {
             return memory;
         };
 
-        UntypedAgent calculatorAgent = buildAgent(
+        CrewTaskAgent calculatorAgent = buildAgent(
                 "Calculator", "Useful for arithmetic and any kind of math. Delegate calculations here.",
                 chatModel, calculatorTool);
-        UntypedAgent weatherAgent = buildAgent(
+        CrewTaskAgent weatherAgent = buildAgent(
                 "Weather", "Useful for current weather in known cities. Delegate weather questions here.",
                 chatModel, weatherTool);
-        UntypedAgent researchAgent = buildAgent(
+        CrewTaskAgent researchAgent = buildAgent(
                 "Research", "Useful for questions about the indexed documents. Delegate document questions here.",
                 chatModel, documentSearchTool);
 
         this.supervisor = AgenticServices.supervisorBuilder()
                 .name("Crew")
                 .description("Coordinates the demo crew of specialized agents.")
-                .supervisorContext("You are the crew supervisor. Decide which agent is best suited for the task "
-                        + "and delegate to it. If no agent fits, answer directly and concisely.")
+                .supervisorContext("When delegating, always pass the entire user request as the "
+                        + "\"task\" argument of the agent invocation. Do not answer the user yourself; "
+                        + "always delegate to one of the sub-agents. Once the task has been resolved, "
+                        + "return an agentName of \"done\" with a recap of the result as the \"response\" "
+                        + "argument.")
                 .chatModel(chatModel)
                 .chatMemoryProvider(memoryProvider)
                 .subAgents(calculatorAgent, weatherAgent, researchAgent)
@@ -76,18 +76,12 @@ public class CrewService {
         return supervisor.invoke(task);
     }
 
-    private static UntypedAgent buildAgent(String name, String description, ChatModel chatModel, Object tool) {
-        return AgenticServices.agentBuilder()
+    private static CrewTaskAgent buildAgent(String name, String description, ChatModel chatModel, Object tool) {
+        return AgenticServices.agentBuilder(CrewTaskAgent.class)
                 .name(name)
                 .description(description)
                 .chatModel(chatModel)
                 .tools(tool)
-                .userMessageProvider(input -> {
-                    if (input instanceof Map<?, ?> map && map.containsKey("task")) {
-                        return String.valueOf(map.get("task"));
-                    }
-                    return String.valueOf(input);
-                })
                 .build();
     }
 }
