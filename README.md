@@ -48,7 +48,7 @@ LangChain4j is a Java framework that simplifies the development of applications 
   - Few-shot classification: labeled examples embedded in the system message
   - Output parsers / structured output: AI services returning an enum, a POJO record, or a `List<String>`
 - Integration features:
-  - REST API under `/api` (chat, RAG, agent, sentiment, movie, topics, search, history)
+  - REST API under `/api` (chat, RAG, agent, SSE streaming, sentiment, movie, topics, describe, template, index, search, store, history)
   - Streaming responses via Server-Sent Events (`/api/chat/stream`)
   - WebSocket streaming chat at `/ws/chat`
   - Database-backed conversation history (H2 via Spring Data JPA)
@@ -66,7 +66,7 @@ LangChain4j is a Java framework that simplifies the development of applications 
   - A `ModelRegistry` (a `ChatModel` bean) delegates every AI service to the selected `provider:model`, switchable at runtime with `/model chat <provider[:model]>`
   - Cross-model evaluation: `/eval compare [rag|chat|sentiment]` runs a golden dataset against every available model and prints a per-model averages table
 - Advanced orchestration (LangChain4j `agentic` module):
-  - A `CrewService`: a supervisor agent delegates tasks to specialized sub-agents (calculator, weather, document research), each bound to an existing `@Tool`; the whole crew shares the switchable `ModelRegistry`
+  - A `CrewService`: a supervisor agent delegates tasks to typed `CrewTaskAgent` sub-agents (calculator, weather, document research), each bound to an existing `@Tool`; the delegated request is passed to the worker as its `task` argument, and the whole crew shares the switchable `ModelRegistry`
   - Streaming function calling: a streaming AI service streams tokens and can still call `@Tool` methods mid-stream
 
 ## Running the Demo
@@ -134,16 +134,16 @@ SSE + WebSocket chat client).
 | Method | Endpoint              | Description                                              |
 |--------|-----------------------|----------------------------------------------------------|
 | POST   | `/api/chat`           | Chat with the memory-backed assistant (`{message}`)      |
-| POST   | `/api/ask`            | RAG question over indexed documents (`{question}`)       |
-| POST   | `/api/agent`          | Delegate a task to the tool-using agent (`{task}`)       |
+| POST   | `/api/ask`            | RAG question over indexed documents (`{message}`)       |
+| POST   | `/api/agent`          | Delegate a task to the tool-using agent (`{message}`)   |
 | GET    | `/api/chat/stream`    | Stream a chat reply over Server-Sent Events (`?message=&conversationId=`; each token is a JSON string) |
 | POST   | `/api/sentiment`      | Sentiment classification (`{text}`)                      |
 | POST   | `/api/movie`          | Extract structured movie data (`{text}`)                 |
 | POST   | `/api/topics`         | Extract a topic list (`{text}`)                          |
 | POST   | `/api/describe`       | Describe an image by URL or base64 (`{imageUrl|imageData, mimeType, question}`) |
 | GET    | `/api/template`       | Render a prompt template (`?movie=`)                     |
-| GET    | `/api/search`         | Semantic search over indexed documents (`?query=`)       |
-| POST   | `/api/index`          | Index a text (`{text}`)                                  |
+| GET    | `/api/search`         | Semantic search over indexed documents (`?q=`)          |
+| POST   | `/api/index`          | Index a file or directory (`?path=`; txt, md, pdf)      |
 | GET    | `/api/store`          | Embedding store stats                                    |
 | GET    | `/api/history`        | List all conversations                                   |
 | GET    | `/api/history/{id}`   | Fetch the message history of one conversation            |
