@@ -65,6 +65,9 @@ LangChain4j is a Java framework that simplifies the development of applications 
   - Multiple providers behind one interface: OpenAI, Anthropic, Google Gemini, and local models via Ollama
   - A `ModelRegistry` (a `ChatModel` bean) delegates every AI service to the selected `provider:model`, switchable at runtime with `/model chat <provider[:model]>`
   - Cross-model evaluation: `/eval compare [rag|chat|sentiment]` runs a golden dataset against every available model and prints a per-model averages table
+- Advanced orchestration (LangChain4j `agentic` module):
+  - A `CrewService`: a supervisor agent delegates tasks to specialized sub-agents (calculator, weather, document research), each bound to an existing `@Tool`; the whole crew shares the switchable `ModelRegistry`
+  - Streaming function calling: a streaming AI service streams tokens and can still call `@Tool` methods mid-stream
 
 ## Running the Demo
 1. Set your API key(s): `export OPENAI_API_KEY=...`, `export ANTHROPIC_API_KEY=...`, `export GOOGLE_AI_GEMINI_API_KEY=...` (Ollama needs none) — or configure `application.properties`
@@ -81,6 +84,8 @@ LangChain4j is a Java framework that simplifies the development of applications 
 /ask <question>             Answer the question using the indexed documents (RAG)
 /agent <task>               Execute a task with the tool-using agent
 /dynamic <task>             Execute a task with dynamically selected tools
+/crew <task>                Execute a task with the agentic supervisor crew
+/stream <task>              Stream a task with streaming function calling
 /describe <url> [question]  Ask a multimodal model about an image
 /generate <prompt>          Generate an image from a text prompt
 /transcribe <file>          Transcribe an audio file to text
@@ -112,6 +117,8 @@ Try a semantic search with the bundled sample documents:
 /ask what does the document say about RAG?
 /agent compute (20 * 5) - 8
 /agent what do the documents say about agents?
+/crew what is 2 + 2?        (supervisor delegates to the calculator sub-agent)
+/stream 12 * 12 = ?         (streams tokens while calling the calculator tool)
 /template Inception
 /sentiment I absolutely loved this movie!
 /movie Inception is a 2010 film directed by Christopher Nolan about dreams. It was great.
@@ -171,12 +178,7 @@ every conversation held through the REST API.
 9. **Evaluation and Testing** — golden datasets, offline metrics (exact match, containment, F1, ROUGE-L, embedding similarity, LLM-as-a-judge), `/eval` CLI command
 10. **Advanced Features** — multi-modal (vision, image generation, speech-to-text), function calling with structured tool parameters and dynamic `ToolProvider`, JSON-schema structured output
 11. **LLM Integration** — OpenAI, Anthropic, Gemini, and Ollama behind a single switchable `ModelRegistry` (a `ChatModel` bean), runtime `/model chat` switching, cross-model `/eval compare`
-
-## Future Experiments and Features to Try
-
-1. **Advanced Orchestration**
-   - Advanced agent orchestration (LangChain4j `agentic` module)
-   - Streaming function calling
+12. **Advanced Orchestration** — a supervisor-based crew (`langchain4j-agentic`) that delegates to specialized tool-bound sub-agents, plus streaming function calling
 
 ## Getting Started
 1. Clone the repository
@@ -217,6 +219,7 @@ every conversation held through the REST API.
 - LangChain4j BOM 1.18.1
 - `langchain4j` and `langchain4j-open-ai` from the BOM
 - `langchain4j-anthropic`, `langchain4j-google-ai-gemini`, and `langchain4j-ollama` for multi-provider chat
+- `langchain4j-agentic` (1.18.0-beta28) for the supervisor-based crew orchestration
 - `langchain4j-document-parser-apache-pdfbox` for PDF parsing
 - `spring-boot-starter-web`, `spring-boot-starter-websocket`, `spring-boot-starter-data-jpa`, and H2 for the REST/streaming/WebSocket/DB integration
 - `spring-boot-devtools`, `spring-boot-starter-actuator`, and `springdoc-openapi-starter-webmvc-ui` (2.9.0) for developer tooling

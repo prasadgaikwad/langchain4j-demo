@@ -121,6 +121,13 @@
             <artifactId>langchain4j-ollama</artifactId>
         </dependency>
 
+        <!-- Experimental agentic framework (uses its own -betaNN versioning, not the BOM). -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-agentic</artifactId>
+            <version>1.18.0-beta28</version>
+        </dependency>
+
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j</artifactId>

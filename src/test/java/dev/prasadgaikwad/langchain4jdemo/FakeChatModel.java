@@ -58,4 +58,10 @@ public class FakeChatModel implements ChatModel {
                 .findFirst()
                 .orElse("");
     }
+
+    public List<String> lastRequestToolNames() {
+        return lastRequest == null || lastRequest.toolSpecifications() == null
+                ? List.of()
+                : lastRequest.toolSpecifications().stream().map(spec -> spec.name()).toList();
+    }
 }

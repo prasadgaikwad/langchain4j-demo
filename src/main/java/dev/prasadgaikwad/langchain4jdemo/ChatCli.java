@@ -2,9 +2,11 @@ package dev.prasadgaikwad.langchain4jdemo;
 
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.ChatMemory;
+import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.ai.DynamicAgent;
+import dev.prasadgaikwad.langchain4jdemo.agentic.CrewService;
 import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
 import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentService;
@@ -31,6 +33,7 @@ import dev.prasadgaikwad.langchain4jdemo.prompt.PromptService;
 import dev.prasadgaikwad.langchain4jdemo.prompt.Sentiment;
 import dev.prasadgaikwad.langchain4jdemo.prompt.TopicExtractor;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
+import dev.prasadgaikwad.langchain4jdemo.streaming.StreamingAgent;
 import dev.prasadgaikwad.langchain4jdemo.structured.JsonSchemaExtractionService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -75,6 +78,8 @@ public class ChatCli implements CommandLineRunner {
     private final JsonSchemaExtractionService jsonSchemaExtractionService;
     private final ModelRegistry modelRegistry;
     private final ModelComparisonService modelComparisonService;
+    private final CrewService crewService;
+    private final StreamingAgent streamingAgent;
     private MemoryType currentMemoryType;
 
     public ChatCli(Assistant assistant,
@@ -95,7 +100,9 @@ public class ChatCli implements CommandLineRunner {
                    DynamicAgent dynamicAgent,
                    JsonSchemaExtractionService jsonSchemaExtractionService,
                    ModelRegistry modelRegistry,
-                   ModelComparisonService modelComparisonService) {
+                   ModelComparisonService modelComparisonService,
+                   CrewService crewService,
+                   StreamingAgent streamingAgent) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chatMemoryRegistry = chatMemoryRegistry;
@@ -115,6 +122,8 @@ public class ChatCli implements CommandLineRunner {
         this.jsonSchemaExtractionService = jsonSchemaExtractionService;
         this.modelRegistry = modelRegistry;
         this.modelComparisonService = modelComparisonService;
+        this.crewService = crewService;
+        this.streamingAgent = streamingAgent;
         this.currentMemoryType = MemoryType.MESSAGE_WINDOW;
     }
 
@@ -169,6 +178,8 @@ public class ChatCli implements CommandLineRunner {
             case "/ask" -> ask(argument);
             case "/agent" -> runAgent(argument);
             case "/dynamic" -> runDynamicAgent(argument);
+            case "/crew" -> runCrew(argument);
+            case "/stream" -> runStreamingAgent(argument);
             case "/describe" -> describeImage(argument);
             case "/generate" -> generateImage(argument);
             case "/transcribe" -> transcribeAudio(argument);
@@ -318,6 +329,38 @@ public class ChatCli implements CommandLineRunner {
         String answer = dynamicAgent.execute(currentMemoryType.memoryId(CONVERSATION_ID), argument.trim());
         System.out.println("Agent > " + answer);
         System.out.println();
+    }
+
+    private void runCrew(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /crew <task>");
+            return;
+        }
+
+        String answer = crewService.run(argument.trim());
+        System.out.println("Crew > " + answer);
+        System.out.println();
+    }
+
+    private void runStreamingAgent(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /stream <task>");
+            return;
+        }
+
+        TokenStream tokenStream = streamingAgent.chat(currentMemoryType.memoryId(CONVERSATION_ID), argument.trim());
+        System.out.print("Stream > ");
+        tokenStream
+                .onPartialResponse(System.out::print)
+                .onCompleteResponse(response -> {
+                    System.out.println();
+                    System.out.println();
+                })
+                .onError(error -> {
+                    System.out.println();
+                    System.out.println("Stream error: " + error.getMessage());
+                })
+                .start();
     }
 
     private void describeImage(String argument) {
@@ -657,6 +700,8 @@ public class ChatCli implements CommandLineRunner {
                   /ask <question>             Answer the question using the indexed documents (RAG)
                   /agent <task>               Execute a task with the tool-using agent
                   /dynamic <task>             Execute a task with dynamically selected tools
+                  /crew <task>                Execute a task with the agentic supervisor crew
+                  /stream <task>              Stream a task with streaming function calling
                   /describe <url> [question]  Ask a multimodal model about an image
                   /generate <prompt>          Generate an image from a text prompt
                   /transcribe <file>          Transcribe an audio file to text

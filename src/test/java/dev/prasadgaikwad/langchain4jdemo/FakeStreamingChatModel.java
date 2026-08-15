@@ -15,6 +15,7 @@ import java.util.List;
 public class FakeStreamingChatModel implements StreamingChatModel {
 
     private final List<String> tokens;
+    private ChatRequest lastRequest;
 
     public FakeStreamingChatModel(String... tokens) {
         this.tokens = List.of(tokens);
@@ -22,6 +23,7 @@ public class FakeStreamingChatModel implements StreamingChatModel {
 
     @Override
     public void doChat(ChatRequest chatRequest, StreamingChatResponseHandler handler) {
+        this.lastRequest = chatRequest;
         StringBuilder fullText = new StringBuilder();
         for (String token : tokens) {
             handler.onPartialResponse(token);
@@ -30,5 +32,15 @@ public class FakeStreamingChatModel implements StreamingChatModel {
         handler.onCompleteResponse(ChatResponse.builder()
                 .aiMessage(AiMessage.from(fullText.toString()))
                 .build());
+    }
+
+    public ChatRequest lastRequest() {
+        return lastRequest;
+    }
+
+    public List<String> lastRequestToolNames() {
+        return lastRequest == null || lastRequest.toolSpecifications() == null
+                ? List.of()
+                : lastRequest.toolSpecifications().stream().map(spec -> spec.name()).toList();
     }
 }
