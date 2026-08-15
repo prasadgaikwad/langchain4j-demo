@@ -21,6 +21,15 @@ LangChain4j is a Java framework that simplifies the development of applications 
 - [Maven Central](https://central.sonatype.com/artifact/dev.langchain4j/langchain4j)
 - [Discord Community](https://discord.gg/KGZtZHZNJD)
 
+## Learnings
+
+Everything this demo taught us about LangChain4j — concepts, code snippets,
+diagrams, and gotchas — is documented topic-by-topic in
+[`docs/learnings/`](docs/learnings/README.md) (34 guides across app
+architecture, AI services, prompts, structured output, memory, documents,
+RAG, tools, agents, streaming, the web layer, multimodal, evaluation, model
+comparison, and offline testing).
+
 ## Current Features
 - Simple command-line interface to interact with user input
 - Spring Boot integration
