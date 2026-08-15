@@ -15,6 +15,10 @@ import dev.prasadgaikwad.langchain4jdemo.evaluation.EvaluationReport;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.EvaluationReportItem;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.EvaluationService;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.GoldenDataset;
+import dev.prasadgaikwad.langchain4jdemo.llm.ComparisonReport;
+import dev.prasadgaikwad.langchain4jdemo.llm.ModelComparisonService;
+import dev.prasadgaikwad.langchain4jdemo.llm.ModelRegistry;
+import dev.prasadgaikwad.langchain4jdemo.llm.ModelScore;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
 import dev.prasadgaikwad.langchain4jdemo.multimodal.ImageGenerationService;
@@ -69,6 +73,8 @@ public class ChatCli implements CommandLineRunner {
     private final SpeechToTextService speechToTextService;
     private final DynamicAgent dynamicAgent;
     private final JsonSchemaExtractionService jsonSchemaExtractionService;
+    private final ModelRegistry modelRegistry;
+    private final ModelComparisonService modelComparisonService;
     private MemoryType currentMemoryType;
 
     public ChatCli(Assistant assistant,
@@ -87,7 +93,9 @@ public class ChatCli implements CommandLineRunner {
                    ImageGenerationService imageGenerationService,
                    SpeechToTextService speechToTextService,
                    DynamicAgent dynamicAgent,
-                   JsonSchemaExtractionService jsonSchemaExtractionService) {
+                   JsonSchemaExtractionService jsonSchemaExtractionService,
+                   ModelRegistry modelRegistry,
+                   ModelComparisonService modelComparisonService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chatMemoryRegistry = chatMemoryRegistry;
@@ -105,6 +113,8 @@ public class ChatCli implements CommandLineRunner {
         this.speechToTextService = speechToTextService;
         this.dynamicAgent = dynamicAgent;
         this.jsonSchemaExtractionService = jsonSchemaExtractionService;
+        this.modelRegistry = modelRegistry;
+        this.modelComparisonService = modelComparisonService;
         this.currentMemoryType = MemoryType.MESSAGE_WINDOW;
     }
 
@@ -447,14 +457,44 @@ public class ChatCli implements CommandLineRunner {
 
     private void handleModelCommand(String argument) {
         if (argument == null) {
+            System.out.println("Chat model     : " + modelRegistry.currentLabel());
             System.out.println("Embedding model: " + searchService.modelName());
+            System.out.println();
+            System.out.println("Usage: /model chat <provider[:model]>");
+            System.out.println("       /model <embedding-model>");
             return;
         }
 
-        String modelName = argument.trim();
-        searchService.setEmbeddingModel(modelName);
-        System.out.println("Switched embedding model to '" + modelName
+        String spec = argument.trim();
+        if (spec.startsWith("chat ")) {
+            switchChatModel(spec.substring("chat ".length()));
+            return;
+        }
+
+        String providerPart = spec.split(":")[0].toLowerCase(Locale.ROOT);
+        if (providerPart.equals("openai") || providerPart.equals("anthropic")
+                || providerPart.equals("gemini") || providerPart.equals("ollama")) {
+            switchChatModel(spec);
+            return;
+        }
+
+        searchService.setEmbeddingModel(spec);
+        System.out.println("Switched embedding model to '" + spec
                 + "'. Re-index documents to embed them with the new model.");
+    }
+
+    private void switchChatModel(String spec) {
+        try {
+            modelRegistry.setModel(spec);
+            System.out.println("Switched chat model to '" + modelRegistry.currentLabel()
+                    + "'. Every AI service now uses this model.");
+        } catch (IllegalArgumentException e) {
+            System.out.println(e.getMessage());
+            System.out.println("Usage: /model chat <provider[:model]> where provider is one of:");
+            for (String entry : modelRegistry.modelList().keySet()) {
+                System.out.println("  " + entry + "  (" + modelRegistry.modelList().get(entry) + ")");
+            }
+        }
     }
 
     private void printStoreStatus() {
@@ -482,9 +522,14 @@ public class ChatCli implements CommandLineRunner {
         String mode = argument != null && !argument.isBlank() ? argument.trim().toLowerCase(Locale.ROOT) : "rag";
         String memoryId = currentMemoryType.memoryId(CONVERSATION_ID);
 
+        boolean compare = mode.equals("compare");
+        String datasetMode = compare && argument != null && !argument.trim().equalsIgnoreCase("compare")
+                ? argument.trim().split("\\s+", 2)[1].toLowerCase(Locale.ROOT)
+                : (compare ? "rag" : mode);
+
         GoldenDataset dataset;
         AnswerProvider provider;
-        switch (mode) {
+        switch (datasetMode) {
             case "rag" -> {
                 if (searchService.storeSize() == 0) {
                     System.out.println("Embedding store is empty. Index some documents first with /index <file-or-directory>.");
@@ -502,16 +547,52 @@ public class ChatCli implements CommandLineRunner {
                 provider = question -> fewShotAssistant.classify(question).name();
             }
             default -> {
-                System.out.println("Unknown evaluation: " + argument.trim()
-                        + " (use: rag | chat | sentiment)");
+                System.out.println("Unknown evaluation: " + datasetMode
+                        + " (use: rag | chat | sentiment | compare[ rag|chat|sentiment])");
                 return;
             }
         }
 
         System.out.println("Evaluating " + dataset.goldenQuestions().size() + " sample(s) on the '" + dataset.name()
                 + "' dataset...");
-        EvaluationReport report = evaluationService.evaluate(dataset, provider);
-        printEvaluationReport(report);
+        if (compare) {
+            runModelComparison(dataset, provider);
+        } else {
+            EvaluationReport report = evaluationService.evaluate(dataset, provider);
+            printEvaluationReport(report);
+        }
+    }
+
+    private void runModelComparison(GoldenDataset dataset, AnswerProvider provider) {
+        List<String> models = modelRegistry.availableModels();
+        if (models.isEmpty()) {
+            System.out.println("No models available for comparison. Set an OPENAI_API_KEY, ANTHROPIC_API_KEY, "
+                    + "or GOOGLE_AI_GEMINI_API_KEY, or start Ollama locally.");
+            return;
+        }
+        System.out.println("Comparing " + models.size() + " model(s): " + String.join(", ", models) + "...");
+        ComparisonReport report = modelComparisonService.compare(dataset, provider);
+        printComparisonReport(report);
+    }
+
+    private void printComparisonReport(ComparisonReport report) {
+        if (report.models().isEmpty()) {
+            System.out.println("Comparison produced no rows.");
+            return;
+        }
+        List<String> metricNames = report.models().get(0).scores().keySet().stream().toList();
+        System.out.println();
+        System.out.println("=== Model comparison: " + report.dataset() + " ===");
+        System.out.println("Model" + " ".repeat(Math.max(1, 38 - "Model".length()))
+                + String.join("  ", metricNames));
+        for (ModelScore row : report.models()) {
+            System.out.println(row.model() + " ".repeat(Math.max(1, 38 - row.model().length()))
+                    + metricNames.stream()
+                            .map(metric -> String.format(Locale.ROOT, "%.2f",
+                                    row.scores().getOrDefault(metric, 0.0)))
+                            .collect(java.util.stream.Collectors.joining("  ")));
+        }
+        System.out.println();
     }
 
     private void printEvaluationReport(EvaluationReport report) {
@@ -587,11 +668,14 @@ public class ChatCli implements CommandLineRunner {
                   /splitter                    Show the current document splitter
                   /splitter <type>             Switch splitter (recursive | paragraph | line | sentence | word | character)
                   /embed <text>               Embed a text and show its vector
-                  /model                      Show the current embedding model
+                  /model                      Show the current chat and embedding models
+                  /model chat <p[:m]>         Switch chat provider/model (e.g. anthropic, gemini:gemini-2.5-flash, ollama)
                   /model <name>               Switch embedding model (%s)
                   /store                      Show embedding store stats
                   /save [path]                Persist the embedding store
                   /eval [rag|chat|sentiment]  Run evaluation metrics over a golden dataset
+                  /eval compare [rag|chat|sentiment]
+                                              Compare every available chat model on a golden dataset
                   quit                        Exit the application
 
                 REST API and WebSocket streaming are also available:

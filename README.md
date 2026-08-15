@@ -61,9 +61,13 @@ LangChain4j is a Java framework that simplifies the development of applications 
   - Function calling: custom tools with structured parameters (record + enum) and conversation-scoped state (`@ToolMemoryId`)
   - Dynamic tool selection: a `ToolProvider` exposes tools per request based on the task
   - Structured output at the model level: JSON schema response format constrains the reply to a record's schema
+- LLM integration:
+  - Multiple providers behind one interface: OpenAI, Anthropic, Google Gemini, and local models via Ollama
+  - A `ModelRegistry` (a `ChatModel` bean) delegates every AI service to the selected `provider:model`, switchable at runtime with `/model chat <provider[:model]>`
+  - Cross-model evaluation: `/eval compare [rag|chat|sentiment]` runs a golden dataset against every available model and prints a per-model averages table
 
 ## Running the Demo
-1. Set your API key: `export OPENAI_API_KEY=...` (or configure `application.properties`)
+1. Set your API key(s): `export OPENAI_API_KEY=...`, `export ANTHROPIC_API_KEY=...`, `export GOOGLE_AI_GEMINI_API_KEY=...` (Ollama needs none) — or configure `application.properties`
 2. Run: `./mvnw spring-boot:run`
 3. Type a question to chat, or use a command:
 
@@ -88,11 +92,15 @@ LangChain4j is a Java framework that simplifies the development of applications 
 /splitter                   Show the current document splitter
 /splitter <type>            Switch splitter (recursive | paragraph | line | sentence | word | character)
 /embed <text>               Embed a text and show its vector
-/model                      Show the current embedding model
+/model                      Show the current chat and embedding models
+/model chat <provider[:model]>
+                            Switch chat provider/model (e.g. anthropic, gemini:gemini-2.5-flash, ollama)
 /model <name>               Switch embedding model
 /store                      Show embedding store stats
 /save [path]                Persist the embedding store
 /eval [rag|chat|sentiment]  Run evaluation metrics over a golden dataset
+/eval compare [rag|chat|sentiment]
+                            Compare every available chat model on a golden dataset
 quit                        Exit the application
 ```
 
@@ -162,15 +170,11 @@ every conversation held through the REST API.
 8. **Developer Tooling** — Spring Boot DevTools auto-restart, Actuator monitoring, Swagger UI for API testing
 9. **Evaluation and Testing** — golden datasets, offline metrics (exact match, containment, F1, ROUGE-L, embedding similarity, LLM-as-a-judge), `/eval` CLI command
 10. **Advanced Features** — multi-modal (vision, image generation, speech-to-text), function calling with structured tool parameters and dynamic `ToolProvider`, JSON-schema structured output
+11. **LLM Integration** — OpenAI, Anthropic, Gemini, and Ollama behind a single switchable `ModelRegistry` (a `ChatModel` bean), runtime `/model chat` switching, cross-model `/eval compare`
 
 ## Future Experiments and Features to Try
 
-1. **LLM Integration**
-   - Connect with different LLM providers (Anthropic, Google, local models via Ollama)
-   - Experiment with different models (GPT-4, Claude)
-   - Compare performance and capabilities
-
-2. **Advanced Orchestration**
+1. **Advanced Orchestration**
    - Advanced agent orchestration (LangChain4j `agentic` module)
    - Streaming function calling
 
@@ -184,7 +188,12 @@ every conversation held through the REST API.
 | Property                    | Default                 | Description                                  |
 |-----------------------------|-------------------------|----------------------------------------------|
 | `app.cli.enabled`           | `true`                  | Enable the interactive command-line chat CLI |
+| `app.chat.provider`        | `openai`                | Default chat provider (`openai` \| `anthropic` \| `gemini` \| `ollama`) |
 | `app.chat.model-name`       | `gpt-4o-mini`           | OpenAI model used for chat                   |
+| `app.models.anthropic-model` | `claude-haiku-4-5-20251001` | Anthropic model used for chat            |
+| `app.models.gemini-model`  | `gemini-2.5-flash`      | Google Gemini model used for chat            |
+| `app.models.ollama-model`  | `llama3.2`              | Ollama model used for chat                   |
+| `app.ollama.base-url`      | `http://localhost:11434` | Ollama server base URL                      |
 | `app.memory.max-messages`   | `10`                    | Max messages kept by `message-window` memory |
 | `app.memory.max-tokens`     | `2000`                  | Max tokens kept by `token-window` memory     |
 | `app.embedding.model-name`  | `text-embedding-3-small` | Embedding model used for indexing/search     |
@@ -207,6 +216,7 @@ every conversation held through the REST API.
 - Spring Boot 3.5.7
 - LangChain4j BOM 1.18.1
 - `langchain4j` and `langchain4j-open-ai` from the BOM
+- `langchain4j-anthropic`, `langchain4j-google-ai-gemini`, and `langchain4j-ollama` for multi-provider chat
 - `langchain4j-document-parser-apache-pdfbox` for PDF parsing
 - `spring-boot-starter-web`, `spring-boot-starter-websocket`, `spring-boot-starter-data-jpa`, and H2 for the REST/streaming/WebSocket/DB integration
 - `spring-boot-devtools`, `spring-boot-starter-actuator`, and `springdoc-openapi-starter-webmvc-ui` (2.9.0) for developer tooling
