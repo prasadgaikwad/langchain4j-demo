@@ -4,11 +4,15 @@ import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.memory.chat.TokenWindowChatMemory;
+import dev.langchain4j.model.audio.AudioTranscriptionModel;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.model.image.ImageModel;
+import dev.langchain4j.model.openai.OpenAiAudioTranscriptionModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
+import dev.langchain4j.model.openai.OpenAiImageModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
 import dev.langchain4j.rag.DefaultRetrievalAugmentor;
@@ -17,9 +21,11 @@ import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.service.AiServices;
 import dev.prasadgaikwad.langchain4jdemo.agent.CalculatorTool;
 import dev.prasadgaikwad.langchain4jdemo.agent.DocumentSearchTool;
+import dev.prasadgaikwad.langchain4jdemo.agent.DynamicToolProvider;
 import dev.prasadgaikwad.langchain4jdemo.agent.EmbeddingStoreStatsTool;
 import dev.prasadgaikwad.langchain4jdemo.ai.Agent;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
+import dev.prasadgaikwad.langchain4jdemo.ai.DynamicAgent;
 import dev.prasadgaikwad.langchain4jdemo.ai.QaAssistant;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
@@ -126,6 +132,49 @@ public class AiConfig {
                 .chatModel(chatModel)
                 .chatMemoryProvider(createChatMemoryProvider(chatMemoryRegistry, modelName, maxMessages, maxTokens))
                 .tools(calculatorTool, documentSearchTool, storeStatsTool)
+                .build();
+    }
+
+    /**
+     * Agent AI service whose tools are chosen per request by a
+     * {@link DynamicToolProvider} instead of a fixed build-time set.
+     */
+    @Bean
+    public DynamicAgent dynamicAgent(ChatModel chatModel,
+                                     DynamicToolProvider toolProvider,
+                                     ChatMemoryRegistry chatMemoryRegistry,
+                                     @Value("${app.chat.model-name:gpt-4o-mini}") String modelName,
+                                     @Value("${app.memory.max-messages:10}") int maxMessages,
+                                     @Value("${app.memory.max-tokens:2000}") int maxTokens) {
+        return AiServices.builder(DynamicAgent.class)
+                .chatModel(chatModel)
+                .chatMemoryProvider(createChatMemoryProvider(chatMemoryRegistry, modelName, maxMessages, maxTokens))
+                .toolProvider(toolProvider)
+                .build();
+    }
+
+    /**
+     * Image model used by the multi-modal demo to generate images from text
+     * prompts ({@code gpt-image-1} by default).
+     */
+    @Bean
+    public ImageModel imageModel(@Value("${app.image.model-name:gpt-image-1}") String modelName) {
+        return OpenAiImageModel.builder()
+                .apiKey(System.getenv("OPENAI_API_KEY"))
+                .modelName(modelName)
+                .build();
+    }
+
+    /**
+     * Audio transcription model used by the speech-to-text demo
+     * ({@code whisper-1} by default).
+     */
+    @Bean
+    public AudioTranscriptionModel audioTranscriptionModel(
+            @Value("${app.stt.model-name:whisper-1}") String modelName) {
+        return OpenAiAudioTranscriptionModel.builder()
+                .apiKey(System.getenv("OPENAI_API_KEY"))
+                .modelName(modelName)
                 .build();
     }
 
