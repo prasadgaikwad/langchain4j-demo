@@ -2,13 +2,18 @@ package dev.prasadgaikwad.langchain4jdemo.llm;
 
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.ModelProvider;
+import dev.langchain4j.model.chat.Capability;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.openai.OpenAiChatRequestParameters;
 import dev.prasadgaikwad.langchain4jdemo.FakeChatModel;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -92,5 +97,62 @@ class ModelRegistryTest {
         registry.setModel("ollama");
 
         assertThat(registry.currentChatModel()).isNotNull();
+    }
+
+    @Test
+    void delegatesModelCapabilitiesToTheCurrentModel() {
+        ProviderAwareFakeChatModel model = new ProviderAwareFakeChatModel("answer");
+        ModelRegistry registry = new ModelRegistry(LlmProvider.OPENAI, "gpt-4o-mini",
+                Map.of("openai:gpt-4o-mini", model));
+
+        assertThat(registry.defaultRequestParameters()).isInstanceOf(OpenAiChatRequestParameters.class);
+        assertThat(registry.supportedCapabilities()).containsExactly(Capability.RESPONSE_FORMAT_JSON_SCHEMA);
+        assertThat(registry.provider()).isEqualTo(ModelProvider.GOOGLE_AI_GEMINI);
+    }
+
+    /**
+     * Regression test for #218: {@code ChatModel.chat(ChatRequest)} merges
+     * {@code defaultRequestParameters()} into the request it sends. The registry
+     * must delegate that to the current model, otherwise the request carries
+     * {@code DefaultChatRequestParameters} and {@code OpenAiChatModel.doChat}
+     * throws a {@code ClassCastException}.
+     */
+    @Test
+    void chatThroughRegistrySendsProviderSpecificRequestParameters() {
+        ProviderAwareFakeChatModel model = new ProviderAwareFakeChatModel("answer");
+        ModelRegistry registry = new ModelRegistry(LlmProvider.OPENAI, "gpt-4o-mini",
+                Map.of("openai:gpt-4o-mini", model));
+
+        registry.chat(ChatRequest.builder().messages(UserMessage.from("hello")).build());
+
+        assertThat(model.lastRequest().parameters()).isInstanceOf(OpenAiChatRequestParameters.class);
+    }
+
+    /**
+     * Fake whose provider-specific capabilities prove the registry delegates to
+     * the current model instead of using the {@code ChatModel} interface
+     * defaults ({@code DefaultChatRequestParameters}, empty capabilities,
+     * {@code ModelProvider.OTHER}).
+     */
+    private static final class ProviderAwareFakeChatModel extends FakeChatModel {
+
+        ProviderAwareFakeChatModel(String responseText) {
+            super(responseText);
+        }
+
+        @Override
+        public ChatRequestParameters defaultRequestParameters() {
+            return OpenAiChatRequestParameters.builder().build();
+        }
+
+        @Override
+        public Set<Capability> supportedCapabilities() {
+            return Set.of(Capability.RESPONSE_FORMAT_JSON_SCHEMA);
+        }
+
+        @Override
+        public ModelProvider provider() {
+            return ModelProvider.GOOGLE_AI_GEMINI;
+        }
     }
 }
