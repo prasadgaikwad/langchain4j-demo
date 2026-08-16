@@ -224,14 +224,14 @@ every conversation held through the REST API.
 | `management.info.env.enabled` | `true`                | Expose `info.*` properties via `/actuator/info` |
 
 ## Current Dependency Versions
-- Spring Boot 3.5.7
-- LangChain4j BOM 1.18.1
+- Spring Boot 4.1.0
+- LangChain4j BOM 1.19.0
 - `langchain4j` and `langchain4j-open-ai` from the BOM
 - `langchain4j-anthropic`, `langchain4j-google-ai-gemini`, and `langchain4j-ollama` for multi-provider chat
-- `langchain4j-agentic` (1.18.0-beta28) for the supervisor-based crew orchestration
+- `langchain4j-agentic` (1.19.0-beta29) for the supervisor-based crew orchestration
 - `langchain4j-document-parser-apache-pdfbox` for PDF parsing
-- `spring-boot-starter-web`, `spring-boot-starter-websocket`, `spring-boot-starter-data-jpa`, and H2 for the REST/streaming/WebSocket/DB integration
-- `spring-boot-devtools`, `spring-boot-starter-actuator`, and `springdoc-openapi-starter-webmvc-ui` (2.9.0) for developer tooling
+- `spring-boot-starter-webmvc`, `spring-boot-starter-websocket`, `spring-boot-starter-data-jpa`, and H2 for the REST/streaming/WebSocket/DB integration
+- `spring-boot-devtools`, `spring-boot-starter-actuator`, and `springdoc-openapi-starter-webmvc-ui` (3.1.0) for developer tooling
 
 ## Dependencies
 - Spring Boot

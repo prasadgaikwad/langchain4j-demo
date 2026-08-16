@@ -1,6 +1,6 @@
 package dev.prasadgaikwad.langchain4jdemo.api;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
 import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
@@ -37,14 +37,14 @@ public class ChatApiController {
     private final ChainService chainService;
     private final ChatStreamingService streamingService;
     private final ConversationHistoryService historyService;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
     public ChatApiController(Assistant assistant,
                              QaService qaService,
                              ChainService chainService,
                              ChatStreamingService streamingService,
                              ConversationHistoryService historyService,
-                             ObjectMapper objectMapper) {
+                             JsonMapper objectMapper) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chainService = chainService;

@@ -1,6 +1,6 @@
 package dev.prasadgaikwad.langchain4jdemo.structured;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
 import dev.prasadgaikwad.langchain4jdemo.FakeChatModel;
 import dev.prasadgaikwad.langchain4jdemo.prompt.MovieReview;
@@ -23,7 +23,7 @@ class JsonSchemaExtractionServiceTest {
     @Test
     void attachesTheJsonSchemaResponseFormatToTheRequest() {
         FakeChatModel chatModel = new FakeChatModel(MOVIE_JSON);
-        JsonSchemaExtractionService service = new JsonSchemaExtractionService(chatModel, new ObjectMapper());
+        JsonSchemaExtractionService service = new JsonSchemaExtractionService(chatModel, new JsonMapper());
 
         service.extractMovie("Tell me about Inception.");
 
@@ -35,7 +35,7 @@ class JsonSchemaExtractionServiceTest {
     @Test
     void parsesTheModelReplyIntoTheMovieReviewRecord() {
         FakeChatModel chatModel = new FakeChatModel(MOVIE_JSON);
-        JsonSchemaExtractionService service = new JsonSchemaExtractionService(chatModel, new ObjectMapper());
+        JsonSchemaExtractionService service = new JsonSchemaExtractionService(chatModel, new JsonMapper());
 
         MovieReview review = service.extractMovie("Tell me about Inception.");
 

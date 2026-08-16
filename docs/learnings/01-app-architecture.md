@@ -1,7 +1,7 @@
 # 01 — App architecture
 
 ## Overview
-A Spring Boot 3.5.7 demo that exercises LangChain4j 1.18.1 capabilities: chat with
+A Spring Boot 4.1.0 demo that exercises LangChain4j 1.19.0 capabilities: chat with
 memory, RAG over embedded documents, tool-using agents, an agentic crew, streaming,
 multimodal, evaluation, and a multi-provider model registry. Everything the CLI can
 do is also exposed over REST/SSE/WebSocket.
