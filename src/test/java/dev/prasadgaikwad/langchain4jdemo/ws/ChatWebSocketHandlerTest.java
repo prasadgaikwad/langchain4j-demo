@@ -1,6 +1,6 @@
 package dev.prasadgaikwad.langchain4jdemo.ws;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import dev.prasadgaikwad.langchain4jdemo.FakeStreamingChatModel;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ class ChatWebSocketHandlerTest {
     private final ChatStreamingService streamingService =
             new ChatStreamingService(new FakeStreamingChatModel("hel", "lo"));
     private final ChatWebSocketHandler handler =
-            new ChatWebSocketHandler(streamingService, new ObjectMapper());
+            new ChatWebSocketHandler(streamingService, new JsonMapper());
 
     @Test
     void streamsTokensAndDoneMarkerAsFrames() throws Exception {

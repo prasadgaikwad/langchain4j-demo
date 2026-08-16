@@ -1,6 +1,6 @@
 package dev.prasadgaikwad.langchain4jdemo.structured;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
@@ -29,9 +29,9 @@ public class JsonSchemaExtractionService {
             """;
 
     private final ChatModel chatModel;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
-    public JsonSchemaExtractionService(ChatModel chatModel, ObjectMapper objectMapper) {
+    public JsonSchemaExtractionService(ChatModel chatModel, JsonMapper objectMapper) {
         this.chatModel = chatModel;
         this.objectMapper = objectMapper;
     }

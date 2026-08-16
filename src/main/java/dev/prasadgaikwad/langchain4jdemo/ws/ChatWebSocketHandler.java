@@ -1,11 +1,12 @@
 package dev.prasadgaikwad.langchain4jdemo.ws;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import tools.jackson.core.JacksonException;
 
 import java.io.IOException;
 
@@ -17,9 +18,9 @@ import java.io.IOException;
 public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     private final ChatStreamingService streamingService;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper objectMapper;
 
-    public ChatWebSocketHandler(ChatStreamingService streamingService, ObjectMapper objectMapper) {
+    public ChatWebSocketHandler(ChatStreamingService streamingService, JsonMapper objectMapper) {
         this.streamingService = streamingService;
         this.objectMapper = objectMapper;
     }
@@ -29,7 +30,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         ChatMessagePayload payload;
         try {
             payload = objectMapper.readValue(message.getPayload(), ChatMessagePayload.class);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             sendQuietly(session, new TextMessage("[ERROR] Invalid message payload: " + e.getMessage()));
             return;
         }

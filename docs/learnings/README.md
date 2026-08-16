@@ -1,7 +1,7 @@
 # Learnings
 
 Concise, personal reference notes for everything this project taught us about
-LangChain4j (1.18.1) and Spring Boot (3.5.7). These docs are **internal** —
+LangChain4j (1.19.0) and Spring Boot (4.1.0). These docs are **internal** —
 they are our own cheat-sheets, not blog posts. Each one follows the same shape:
 
 - **Overview** — what and why
