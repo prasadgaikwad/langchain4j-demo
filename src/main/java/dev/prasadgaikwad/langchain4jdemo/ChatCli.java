@@ -11,6 +11,8 @@ import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
 import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainOfAgentsService;
+import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.AnswerProvider;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.EvaluationReport;
@@ -80,6 +82,7 @@ public class ChatCli implements CommandLineRunner {
     private final ModelComparisonService modelComparisonService;
     private final CrewService crewService;
     private final StreamingAgent streamingAgent;
+    private final ChainOfAgentsService chainOfAgentsService;
     private MemoryType currentMemoryType;
 
     public ChatCli(Assistant assistant,
@@ -102,7 +105,8 @@ public class ChatCli implements CommandLineRunner {
                    ModelRegistry modelRegistry,
                    ModelComparisonService modelComparisonService,
                    CrewService crewService,
-                   StreamingAgent streamingAgent) {
+                   StreamingAgent streamingAgent,
+                   ChainOfAgentsService chainOfAgentsService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chatMemoryRegistry = chatMemoryRegistry;
@@ -124,6 +128,7 @@ public class ChatCli implements CommandLineRunner {
         this.modelComparisonService = modelComparisonService;
         this.crewService = crewService;
         this.streamingAgent = streamingAgent;
+        this.chainOfAgentsService = chainOfAgentsService;
         this.currentMemoryType = MemoryType.MESSAGE_WINDOW;
     }
 
@@ -179,6 +184,7 @@ public class ChatCli implements CommandLineRunner {
             case "/agent" -> runAgent(argument);
             case "/dynamic" -> runDynamicAgent(argument);
             case "/crew" -> runCrew(argument);
+            case "/chain" -> runChain(argument);
             case "/stream" -> runStreamingAgent(argument);
             case "/describe" -> describeImage(argument);
             case "/generate" -> generateImage(argument);
@@ -339,6 +345,29 @@ public class ChatCli implements CommandLineRunner {
 
         String answer = crewService.run(argument.trim());
         System.out.println("Crew > " + answer);
+        System.out.println();
+    }
+
+    private void runChain(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /chain <topic>");
+            return;
+        }
+
+        System.out.println("Chain > Generating blog post for: \"" + argument.trim() + "\"...");
+        System.out.println();
+        var result = chainOfAgentsService.runWithTrace(argument.trim());
+        System.out.println("=== Outline ===");
+        System.out.println(result.outline());
+        System.out.println();
+        System.out.println("=== Draft ===");
+        System.out.println(result.draft());
+        System.out.println();
+        System.out.println("=== Edited ===");
+        System.out.println(result.edited());
+        System.out.println();
+        System.out.println("=== Formatted ===");
+        System.out.println(result.formatted());
         System.out.println();
     }
 
@@ -701,6 +730,7 @@ public class ChatCli implements CommandLineRunner {
                   /agent <task>               Execute a task with the tool-using agent
                   /dynamic <task>             Execute a task with dynamically selected tools
                   /crew <task>                Execute a task with the agentic supervisor crew
+                  /chain <topic>             Generate a blog post via a sequential chain of agents
                   /stream <task>              Stream a task with streaming function calling
                   /describe <url> [question]  Ask a multimodal model about an image
                   /generate <prompt>          Generate an image from a text prompt

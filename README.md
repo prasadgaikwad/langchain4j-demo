@@ -28,7 +28,7 @@ diagrams, and gotchas — is documented topic-by-topic in
 [`docs/learnings/`](docs/learnings/README.md) (34 guides across app
 architecture, AI services, prompts, structured output, memory, documents,
 RAG, tools, agents, streaming, the web layer, multimodal, evaluation, model
-comparison, and offline testing).
+comparison, offline testing, and chain-of-agents prompt chaining).
 
 ## Current Features
 - Simple command-line interface to interact with user input
@@ -76,6 +76,7 @@ comparison, and offline testing).
   - Cross-model evaluation: `/eval compare [rag|chat|sentiment]` runs a golden dataset against every available model and prints a per-model averages table
 - Advanced orchestration (LangChain4j `agentic` module):
   - A `CrewService`: a supervisor agent delegates tasks to typed `CrewTaskAgent` sub-agents (calculator, weather, document research), each bound to an existing `@Tool`; the delegated request is passed to the worker as its `task` argument, and the whole crew shares the switchable `ModelRegistry`
+  - A `ChainOfAgentsService`: a sequential blog-post pipeline (Outline → Draft → Edit → Format) built with `AgenticServices.sequenceBuilder()`, where each typed sub-agent reads/writes to a shared `AgenticScope` and the full pipeline trace is exposed via REST
   - Streaming function calling: a streaming AI service streams tokens and can still call `@Tool` methods mid-stream
 
 ## Running the Demo
@@ -94,6 +95,7 @@ comparison, and offline testing).
 /agent <task>               Execute a task with the tool-using agent
 /dynamic <task>             Execute a task with dynamically selected tools
 /crew <task>                Execute a task with the agentic supervisor crew
+/chain <topic>             Generate a blog post via a sequential chain of agents
 /stream <task>              Stream a task with streaming function calling
 /describe <url> [question]  Ask a multimodal model about an image
 /generate <prompt>          Generate an image from a text prompt
@@ -145,6 +147,7 @@ SSE + WebSocket chat client).
 | POST   | `/api/chat`           | Chat with the memory-backed assistant (`{message}`)      |
 | POST   | `/api/ask`            | RAG question over indexed documents (`{message}`)       |
 | POST   | `/api/agent`          | Delegate a task to the tool-using agent (`{message}`)   |
+| POST   | `/api/chain`          | Run a sequential chain-of-agents pipeline (`{message}` topic) |
 | GET    | `/api/chat/stream`    | Stream a chat reply over Server-Sent Events (`?message=&conversationId=`; each token is a JSON string) |
 | POST   | `/api/sentiment`      | Sentiment classification (`{text}`)                      |
 | POST   | `/api/movie`          | Extract structured movie data (`{text}`)                 |
@@ -188,6 +191,7 @@ every conversation held through the REST API.
 10. **Advanced Features** — multi-modal (vision, image generation, speech-to-text), function calling with structured tool parameters and dynamic `ToolProvider`, JSON-schema structured output
 11. **LLM Integration** — OpenAI, Anthropic, Gemini, and Ollama behind a single switchable `ModelRegistry` (a `ChatModel` bean), runtime `/model chat` switching, cross-model `/eval compare`
 12. **Advanced Orchestration** — a supervisor-based crew (`langchain4j-agentic`) that delegates to specialized tool-bound sub-agents, plus streaming function calling
+13. **Chain of Agents** — a sequential prompt-chaining pipeline (Outline → Draft → Edit → Format) built with `AgenticServices.sequenceBuilder()`, exposed via CLI and REST with full trace output
 
 ## Getting Started
 1. Clone the repository
