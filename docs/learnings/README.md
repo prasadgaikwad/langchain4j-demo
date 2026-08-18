@@ -29,6 +29,7 @@ flowchart LR
         CHAIN[ChainService]
         EVAL[EvaluationService]
         CREW[CrewService\nsupervisor + sub-agents]
+        CHAIN_AGENTS[ChainOfAgentsService\nsequence builder pipeline]
     end
 
     subgraph Models["LangChain4j model layer"]
@@ -55,6 +56,7 @@ flowchart LR
     AS --> TOOLS
     CREW --> MOD
     CREW --> TOOLS
+    CHAIN_AGENTS --> MOD
     CHAIN --> AS
     EVAL --> AS
     MOD --> CM
@@ -118,6 +120,7 @@ runtime switches **every** AI service (assistant, RAG, agent, judge, crew).
 |---|-----|-----------|
 | 24 | [typed-sub-agents](24-typed-sub-agents.md) | Supervisor + typed sub-agent delegation |
 | 25 | [troubleshooting-delegation](25-troubleshooting-delegation.md) | Why untyped `invoke(Map)` sub-agents get the memory id, not the task |
+| 35 | [chain-of-agents](35-chain-of-agents.md) | Sequential prompt chaining via `sequenceBuilder()` |
 
 ### G. Streaming & web layer
 | # | Doc | One-liner |

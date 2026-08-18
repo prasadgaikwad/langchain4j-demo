@@ -4,6 +4,8 @@ import tools.jackson.databind.json.JsonMapper;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
 import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainOfAgentsService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,19 +40,22 @@ public class ChatApiController {
     private final ChatStreamingService streamingService;
     private final ConversationHistoryService historyService;
     private final JsonMapper objectMapper;
+    private final ChainOfAgentsService chainOfAgentsService;
 
     public ChatApiController(Assistant assistant,
                              QaService qaService,
                              ChainService chainService,
                              ChatStreamingService streamingService,
                              ConversationHistoryService historyService,
-                             JsonMapper objectMapper) {
+                             JsonMapper objectMapper,
+                             ChainOfAgentsService chainOfAgentsService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chainService = chainService;
         this.streamingService = streamingService;
         this.historyService = historyService;
         this.objectMapper = objectMapper;
+        this.chainOfAgentsService = chainOfAgentsService;
     }
 
     @PostMapping("/chat")
@@ -90,6 +95,22 @@ public class ChatApiController {
         String answer = chainService.ask(request.conversationId(), request.message());
         recordTurn(request.conversationId(), request.message(), answer);
         return new ChatResponse(answer);
+    }
+
+    @PostMapping("/chain")
+    @Operation(summary = "Generate a blog post via a sequential chain of agents",
+            description = "Runs the topic through a pipeline of Outline -> Draft -> Edit -> Format agents. "
+                    + "Returns the full pipeline trace with each intermediate stage.")
+    @ApiResponse(responseCode = "200", description = "The complete pipeline trace",
+            content = @Content(schema = @Schema(implementation = ChainResponse.class)))
+    public ChainResponse chain(@RequestBody ChatRequest request) {
+        ChainPipelineResult result = chainOfAgentsService.runWithTrace(request.message());
+        return new ChainResponse(
+                result.topic(),
+                result.outline(),
+                result.draft(),
+                result.edited(),
+                result.formatted());
     }
 
     /**

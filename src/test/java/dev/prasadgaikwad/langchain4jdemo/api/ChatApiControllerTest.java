@@ -3,6 +3,8 @@ package dev.prasadgaikwad.langchain4jdemo.api;
 import dev.prasadgaikwad.langchain4jdemo.ai.Assistant;
 import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
 import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainOfAgentsService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import org.junit.jupiter.api.Test;
@@ -44,6 +46,9 @@ class ChatApiControllerTest {
 
     @MockitoBean
     ChatStreamingService streamingService;
+
+    @MockitoBean
+    ChainOfAgentsService chainOfAgentsService;
 
     @Autowired
     ConversationHistoryService historyService;
@@ -150,6 +155,22 @@ class ChatApiControllerTest {
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].text").value("hi"))
                 .andExpect(jsonPath("$[1].text").value("Why not"));
+    }
+
+    @Test
+    void chainReturnsFullPipelineTrace() throws Exception {
+        when(chainOfAgentsService.runWithTrace("test topic")).thenReturn(
+                new ChainPipelineResult("test topic", "# Outline", "Draft text", "Edited text", "# Formatted post"));
+
+        mockMvc.perform(post("/api/chain")
+                        .contentType("application/json")
+                        .content("{\"message\":\"test topic\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topic").value("test topic"))
+                .andExpect(jsonPath("$.outline").value("# Outline"))
+                .andExpect(jsonPath("$.draft").value("Draft text"))
+                .andExpect(jsonPath("$.edited").value("Edited text"))
+                .andExpect(jsonPath("$.formatted").value("# Formatted post"));
     }
 
     @Test
