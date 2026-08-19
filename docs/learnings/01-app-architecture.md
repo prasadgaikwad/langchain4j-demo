@@ -55,8 +55,8 @@ flowchart LR
 ## Related files
 - `src/main/java/dev/prasadgaikwad/langchain4jdemo/**` — packages map 1:1 to
   capabilities (`agent`, `agentic`, `ai`, `chain`, `config`, `db`, `document`,
-  `embedding`, `evaluation`, `llm`, `memory`, `multimodal`, `prompt`, `rag`,
-  `streaming`, `structured`, `ws`, `api`).
+  `embedding`, `evaluation`, `llm`, `memory`, `multimodal`, `orchestration`,
+  `prompt`, `rag`, `streaming`, `structured`, `ws`, `api`).
 - `pom.xml`, `src/main/resources/application.properties`,
   `src/main/resources/static/index.html` (feature summary page).
 

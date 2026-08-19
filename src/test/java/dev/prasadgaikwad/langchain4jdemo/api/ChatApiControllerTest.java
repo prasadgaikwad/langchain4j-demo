@@ -5,9 +5,13 @@ import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
 import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainPipelineResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphOfAgentsService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,6 +53,9 @@ class ChatApiControllerTest {
 
     @MockitoBean
     ChainOfAgentsService chainOfAgentsService;
+
+    @MockitoBean
+    GraphOfAgentsService graphOfAgentsService;
 
     @Autowired
     ConversationHistoryService historyService;
@@ -171,6 +178,29 @@ class ChatApiControllerTest {
                 .andExpect(jsonPath("$.draft").value("Draft text"))
                 .andExpect(jsonPath("$.edited").value("Edited text"))
                 .andExpect(jsonPath("$.formatted").value("# Formatted post"));
+    }
+
+    @Test
+    void graphReturnsFullPipelineTrace() throws Exception {
+        when(graphOfAgentsService.runWithTrace("test prompt")).thenReturn(
+                new GraphPipelineResult("test prompt", "DevOps profile", "K8s topic",
+                        "# Outline", "Draft text", "Edited text", "# Final writeup",
+                        List.of("extractProfile", "suggestTopic", "createOutline",
+                                "writeDraft", "editDraft", "createWriteup")));
+
+        mockMvc.perform(post("/api/graph")
+                        .contentType("application/json")
+                        .content("{\"message\":\"test prompt\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prompt").value("test prompt"))
+                .andExpect(jsonPath("$.profile").value("DevOps profile"))
+                .andExpect(jsonPath("$.topic").value("K8s topic"))
+                .andExpect(jsonPath("$.outline").value("# Outline"))
+                .andExpect(jsonPath("$.draft").value("Draft text"))
+                .andExpect(jsonPath("$.edited").value("Edited text"))
+                .andExpect(jsonPath("$.writeup").value("# Final writeup"))
+                .andExpect(jsonPath("$.agentPath").isArray())
+                .andExpect(jsonPath("$.agentPath.length()").value(6));
     }
 
     @Test

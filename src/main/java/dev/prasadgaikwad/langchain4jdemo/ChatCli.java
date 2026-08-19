@@ -12,6 +12,7 @@ import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainOfAgentsService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.AnswerProvider;
@@ -83,6 +84,7 @@ public class ChatCli implements CommandLineRunner {
     private final CrewService crewService;
     private final StreamingAgent streamingAgent;
     private final ChainOfAgentsService chainOfAgentsService;
+    private final GraphOfAgentsService graphOfAgentsService;
     private MemoryType currentMemoryType;
 
     public ChatCli(Assistant assistant,
@@ -106,7 +108,8 @@ public class ChatCli implements CommandLineRunner {
                    ModelComparisonService modelComparisonService,
                    CrewService crewService,
                    StreamingAgent streamingAgent,
-                   ChainOfAgentsService chainOfAgentsService) {
+                   ChainOfAgentsService chainOfAgentsService,
+                   GraphOfAgentsService graphOfAgentsService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chatMemoryRegistry = chatMemoryRegistry;
@@ -129,6 +132,7 @@ public class ChatCli implements CommandLineRunner {
         this.crewService = crewService;
         this.streamingAgent = streamingAgent;
         this.chainOfAgentsService = chainOfAgentsService;
+        this.graphOfAgentsService = graphOfAgentsService;
         this.currentMemoryType = MemoryType.MESSAGE_WINDOW;
     }
 
@@ -185,6 +189,7 @@ public class ChatCli implements CommandLineRunner {
             case "/dynamic" -> runDynamicAgent(argument);
             case "/crew" -> runCrew(argument);
             case "/chain" -> runChain(argument);
+            case "/graph" -> runGraph(argument);
             case "/stream" -> runStreamingAgent(argument);
             case "/describe" -> describeImage(argument);
             case "/generate" -> generateImage(argument);
@@ -368,6 +373,38 @@ public class ChatCli implements CommandLineRunner {
         System.out.println();
         System.out.println("=== Formatted ===");
         System.out.println(result.formatted());
+        System.out.println();
+    }
+
+    private void runGraph(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /graph <prompt>");
+            return;
+        }
+
+        System.out.println("Graph > Running GOAP planner for: \"" + argument.trim() + "\"...");
+        System.out.println();
+        var result = graphOfAgentsService.runWithTrace(argument.trim());
+        System.out.println("=== Agent Path ===");
+        System.out.println(String.join(" -> ", result.agentPath()));
+        System.out.println();
+        System.out.println("=== Profile ===");
+        System.out.println(result.profile());
+        System.out.println();
+        System.out.println("=== Topic ===");
+        System.out.println(result.topic());
+        System.out.println();
+        System.out.println("=== Outline ===");
+        System.out.println(result.outline());
+        System.out.println();
+        System.out.println("=== Draft ===");
+        System.out.println(result.draft());
+        System.out.println();
+        System.out.println("=== Edited ===");
+        System.out.println(result.edited());
+        System.out.println();
+        System.out.println("=== Writeup ===");
+        System.out.println(result.writeup());
         System.out.println();
     }
 
@@ -731,6 +768,7 @@ public class ChatCli implements CommandLineRunner {
                   /dynamic <task>             Execute a task with dynamically selected tools
                   /crew <task>                Execute a task with the agentic supervisor crew
                   /chain <topic>             Generate a blog post via a sequential chain of agents
+                  /graph <prompt>           Generate a personalized blog post via a goal-oriented agent graph
                   /stream <task>              Stream a task with streaming function calling
                   /describe <url> [question]  Ask a multimodal model about an image
                   /generate <prompt>          Generate an image from a text prompt
