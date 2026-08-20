@@ -6,6 +6,8 @@ import dev.prasadgaikwad.langchain4jdemo.chain.ChainService;
 import dev.prasadgaikwad.langchain4jdemo.db.ConversationHistoryService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainPipelineResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphOfAgentsService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,6 +43,7 @@ public class ChatApiController {
     private final ConversationHistoryService historyService;
     private final JsonMapper objectMapper;
     private final ChainOfAgentsService chainOfAgentsService;
+    private final GraphOfAgentsService graphOfAgentsService;
 
     public ChatApiController(Assistant assistant,
                              QaService qaService,
@@ -48,7 +51,8 @@ public class ChatApiController {
                              ChatStreamingService streamingService,
                              ConversationHistoryService historyService,
                              JsonMapper objectMapper,
-                             ChainOfAgentsService chainOfAgentsService) {
+                             ChainOfAgentsService chainOfAgentsService,
+                             GraphOfAgentsService graphOfAgentsService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chainService = chainService;
@@ -56,6 +60,7 @@ public class ChatApiController {
         this.historyService = historyService;
         this.objectMapper = objectMapper;
         this.chainOfAgentsService = chainOfAgentsService;
+        this.graphOfAgentsService = graphOfAgentsService;
     }
 
     @PostMapping("/chat")
@@ -111,6 +116,26 @@ public class ChatApiController {
                 result.draft(),
                 result.edited(),
                 result.formatted());
+    }
+
+    @PostMapping("/graph")
+    @Operation(summary = "Generate a personalized blog post via a goal-oriented agent graph (GOAP)",
+            description = "Runs the prompt through a GOAP-planned pipeline of agents. "
+                    + "The planner analyzes agent dependencies and computes the shortest execution path. "
+                    + "Returns the full trace including the computed agent path.")
+    @ApiResponse(responseCode = "200", description = "The complete graph pipeline trace",
+            content = @Content(schema = @Schema(implementation = GraphResponse.class)))
+    public GraphResponse graph(@RequestBody ChatRequest request) {
+        GraphPipelineResult result = graphOfAgentsService.runWithTrace(request.message());
+        return new GraphResponse(
+                result.prompt(),
+                result.profile(),
+                result.topic(),
+                result.outline(),
+                result.draft(),
+                result.edited(),
+                result.writeup(),
+                result.agentPath());
     }
 
     /**
