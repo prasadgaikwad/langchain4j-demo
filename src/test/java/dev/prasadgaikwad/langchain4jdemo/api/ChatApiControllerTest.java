@@ -7,6 +7,8 @@ import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphPipelineResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowOfAgentsService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import org.junit.jupiter.api.Test;
@@ -56,6 +58,9 @@ class ChatApiControllerTest {
 
     @MockitoBean
     GraphOfAgentsService graphOfAgentsService;
+
+    @MockitoBean
+    WorkflowOfAgentsService workflowOfAgentsService;
 
     @Autowired
     ConversationHistoryService historyService;
@@ -201,6 +206,29 @@ class ChatApiControllerTest {
                 .andExpect(jsonPath("$.writeup").value("# Final writeup"))
                 .andExpect(jsonPath("$.agentPath").isArray())
                 .andExpect(jsonPath("$.agentPath.length()").value(6));
+    }
+
+    @Test
+    void workflowReturnsFullPipelineTrace() throws Exception {
+        when(workflowOfAgentsService.run("test topic")).thenReturn(
+                new WorkflowPipelineResult("test topic", "Combined research", "Draft text",
+                        "# Formatted post", 2, "technical",
+                        List.of("ResearchAgent1", "ResearchAgent2", "WorkflowDraftAgent",
+                                "QualityScorerAgent", "ImproveAgent", "CategoryAgent",
+                                "TechnicalFormatAgent")));
+
+        mockMvc.perform(post("/api/workflow")
+                        .contentType("application/json")
+                        .content("{\"message\":\"test topic\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topic").value("test topic"))
+                .andExpect(jsonPath("$.research").value("Combined research"))
+                .andExpect(jsonPath("$.draft").value("Draft text"))
+                .andExpect(jsonPath("$.formatted").value("# Formatted post"))
+                .andExpect(jsonPath("$.refinementIterations").value(2))
+                .andExpect(jsonPath("$.category").value("technical"))
+                .andExpect(jsonPath("$.executedAgents").isArray())
+                .andExpect(jsonPath("$.executedAgents.length()").value(7));
     }
 
     @Test

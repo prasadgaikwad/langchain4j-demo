@@ -8,6 +8,8 @@ import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphPipelineResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowOfAgentsService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -44,6 +46,7 @@ public class ChatApiController {
     private final JsonMapper objectMapper;
     private final ChainOfAgentsService chainOfAgentsService;
     private final GraphOfAgentsService graphOfAgentsService;
+    private final WorkflowOfAgentsService workflowOfAgentsService;
 
     public ChatApiController(Assistant assistant,
                              QaService qaService,
@@ -52,7 +55,8 @@ public class ChatApiController {
                              ConversationHistoryService historyService,
                              JsonMapper objectMapper,
                              ChainOfAgentsService chainOfAgentsService,
-                             GraphOfAgentsService graphOfAgentsService) {
+                             GraphOfAgentsService graphOfAgentsService,
+                             WorkflowOfAgentsService workflowOfAgentsService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chainService = chainService;
@@ -61,6 +65,7 @@ public class ChatApiController {
         this.objectMapper = objectMapper;
         this.chainOfAgentsService = chainOfAgentsService;
         this.graphOfAgentsService = graphOfAgentsService;
+        this.workflowOfAgentsService = workflowOfAgentsService;
     }
 
     @PostMapping("/chat")
@@ -116,6 +121,25 @@ public class ChatApiController {
                 result.draft(),
                 result.edited(),
                 result.formatted());
+    }
+
+    @PostMapping("/workflow")
+    @Operation(summary = "Generate a blog post via a workflow pipeline with parallel research, iterative refinement, and conditional formatting",
+            description = "Runs the topic through a workflow combining parallel research, draft creation, "
+                    + "iterative quality refinement (loop with exit condition), and conditional formatting. "
+                    + "Returns the full pipeline trace including refinement iterations and category.")
+    @ApiResponse(responseCode = "200", description = "The complete workflow pipeline trace",
+            content = @Content(schema = @Schema(implementation = WorkflowResponse.class)))
+    public WorkflowResponse workflow(@RequestBody ChatRequest request) {
+        WorkflowPipelineResult result = workflowOfAgentsService.run(request.message());
+        return new WorkflowResponse(
+                result.topic(),
+                result.research(),
+                result.draft(),
+                result.formatted(),
+                result.refinementIterations(),
+                result.category(),
+                result.executedAgents());
     }
 
     @PostMapping("/graph")
