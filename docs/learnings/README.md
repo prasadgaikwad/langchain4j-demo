@@ -31,6 +31,7 @@ flowchart LR
         CREW[CrewService\nsupervisor + sub-agents]
         CHAIN_AGENTS[ChainOfAgentsService\nsequence builder pipeline]
         GRAPH_AGENTS[GraphOfAgentsService\nGOAP planner pipeline]
+        WORKFLOW[WorkflowOfAgentsService\nparallel/loop/conditional]
     end
 
     subgraph Models["LangChain4j model layer"]
@@ -59,6 +60,7 @@ flowchart LR
     CREW --> TOOLS
     CHAIN_AGENTS --> MOD
     GRAPH_AGENTS --> MOD
+    WORKFLOW --> MOD
     CHAIN --> AS
     EVAL --> AS
     MOD --> CM
@@ -124,6 +126,7 @@ runtime switches **every** AI service (assistant, RAG, agent, judge, crew).
 | 25 | [troubleshooting-delegation](25-troubleshooting-delegation.md) | Why untyped `invoke(Map)` sub-agents get the memory id, not the task |
 | 35 | [chain-of-agents](35-chain-of-agents.md) | Sequential prompt chaining via `sequenceBuilder()` |
 | 36 | [graph-of-agents-goap](36-graph-of-agents-goap.md) | Goal-oriented agent graph via `plannerBuilder()` + `GoalOrientedPlanner` |
+| 37 | [workflow-composition](37-workflow-composition.md) | Parallel, loop, and conditional workflow patterns via `AgenticServices` |
 
 ### G. Streaming & web layer
 | # | Doc | One-liner |
