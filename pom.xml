@@ -150,6 +150,18 @@
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-document-parser-apache-pdfbox</artifactId>
         </dependency>
+
+        <!-- LangGraph4j: stateful graph-based agent orchestration with LangChain4j integration -->
+        <dependency>
+            <groupId>org.bsc.langgraph4j</groupId>
+            <artifactId>langgraph4j-langchain4j</artifactId>
+            <version>1.8.20</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bsc.langgraph4j</groupId>
+            <artifactId>langgraph4j-agent-executor</artifactId>
+            <version>1.8.20</version>
+        </dependency>
     </dependencies>
 
     <build>

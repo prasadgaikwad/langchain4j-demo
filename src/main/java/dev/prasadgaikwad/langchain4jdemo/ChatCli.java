@@ -14,6 +14,7 @@ import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ChainOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowOfAgentsService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService;
 import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.AnswerProvider;
@@ -87,6 +88,7 @@ public class ChatCli implements CommandLineRunner {
     private final ChainOfAgentsService chainOfAgentsService;
     private final GraphOfAgentsService graphOfAgentsService;
     private final WorkflowOfAgentsService workflowOfAgentsService;
+    private final ReactAgentService reactAgentService;
     private MemoryType currentMemoryType;
 
     public ChatCli(Assistant assistant,
@@ -112,7 +114,8 @@ public class ChatCli implements CommandLineRunner {
                    StreamingAgent streamingAgent,
                    ChainOfAgentsService chainOfAgentsService,
                    GraphOfAgentsService graphOfAgentsService,
-                   WorkflowOfAgentsService workflowOfAgentsService) {
+                   WorkflowOfAgentsService workflowOfAgentsService,
+                   ReactAgentService reactAgentService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chatMemoryRegistry = chatMemoryRegistry;
@@ -137,6 +140,7 @@ public class ChatCli implements CommandLineRunner {
         this.chainOfAgentsService = chainOfAgentsService;
         this.graphOfAgentsService = graphOfAgentsService;
         this.workflowOfAgentsService = workflowOfAgentsService;
+        this.reactAgentService = reactAgentService;
         this.currentMemoryType = MemoryType.MESSAGE_WINDOW;
     }
 
@@ -195,6 +199,7 @@ public class ChatCli implements CommandLineRunner {
             case "/chain" -> runChain(argument);
             case "/graph" -> runGraph(argument);
             case "/workflow" -> runWorkflow(argument);
+            case "/react" -> runReact(argument);
             case "/stream" -> runStreamingAgent(argument);
             case "/describe" -> describeImage(argument);
             case "/generate" -> generateImage(argument);
@@ -404,6 +409,23 @@ public class ChatCli implements CommandLineRunner {
         System.out.println();
         System.out.println("=== Formatted ===");
         System.out.println(result.formatted());
+        System.out.println();
+    }
+
+    private void runReact(String argument) {
+        if (argument == null) {
+            System.out.println("Usage: /react <task>");
+            return;
+        }
+
+        System.out.println("React > Running LangGraph4j ReACT agent for: \"" + argument.trim() + "\"...");
+        System.out.println();
+        var result = reactAgentService.run(argument.trim());
+        System.out.println("=== Steps ===");
+        System.out.println(String.join(" -> ", result.steps()));
+        System.out.println();
+        System.out.println("=== Answer ===");
+        System.out.println(result.answer());
         System.out.println();
     }
 
@@ -801,6 +823,7 @@ public class ChatCli implements CommandLineRunner {
                   /chain <topic>             Generate a blog post via a sequential chain of agents
                    /graph <prompt>           Generate a personalized blog post via a goal-oriented agent graph
                    /workflow <topic>         Generate a blog post via parallel/loop/conditional workflow
+                   /react <task>             Run a task with the LangGraph4j ReACT agent executor
                   /stream <task>              Stream a task with streaming function calling
                   /describe <url> [question]  Ask a multimodal model about an image
                   /generate <prompt>          Generate an image from a text prompt
