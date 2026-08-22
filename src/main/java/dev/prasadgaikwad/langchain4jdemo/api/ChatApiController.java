@@ -10,6 +10,12 @@ import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowPipelineResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService.ReactResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService.StatefulResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.HumanInTheLoopService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.HumanInTheLoopService.HitlResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * REST endpoints for chat, RAG, and the tool-using agent, plus a Server-Sent
@@ -47,6 +54,9 @@ public class ChatApiController {
     private final ChainOfAgentsService chainOfAgentsService;
     private final GraphOfAgentsService graphOfAgentsService;
     private final WorkflowOfAgentsService workflowOfAgentsService;
+    private final ReactAgentService reactAgentService;
+    private final StatefulPipelineService statefulPipelineService;
+    private final HumanInTheLoopService humanInTheLoopService;
 
     public ChatApiController(Assistant assistant,
                              QaService qaService,
@@ -56,7 +66,10 @@ public class ChatApiController {
                              JsonMapper objectMapper,
                              ChainOfAgentsService chainOfAgentsService,
                              GraphOfAgentsService graphOfAgentsService,
-                             WorkflowOfAgentsService workflowOfAgentsService) {
+                             WorkflowOfAgentsService workflowOfAgentsService,
+                             ReactAgentService reactAgentService,
+                             StatefulPipelineService statefulPipelineService,
+                             HumanInTheLoopService humanInTheLoopService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chainService = chainService;
@@ -66,6 +79,9 @@ public class ChatApiController {
         this.chainOfAgentsService = chainOfAgentsService;
         this.graphOfAgentsService = graphOfAgentsService;
         this.workflowOfAgentsService = workflowOfAgentsService;
+        this.reactAgentService = reactAgentService;
+        this.statefulPipelineService = statefulPipelineService;
+        this.humanInTheLoopService = humanInTheLoopService;
     }
 
     @PostMapping("/chat")
@@ -160,6 +176,70 @@ public class ChatApiController {
                 result.edited(),
                 result.writeup(),
                 result.agentPath());
+    }
+
+    @PostMapping("/react")
+    @Operation(summary = "Run a task through the LangGraph4j ReACT agent executor",
+            description = "Runs the task through an explicit agent→action→agent state graph built with "
+                    + "LangGraph4j's AgentExecutor. The LLM reasons, selects tools, observes results, "
+                    + "and iterates until it produces a final answer. Returns the graph step trace and answer.")
+    @ApiResponse(responseCode = "200", description = "The ReACT agent result with step trace",
+            content = @Content(schema = @Schema(implementation = ReactResponse.class)))
+    public ReactResponse react(@RequestBody ChatRequest request) {
+        ReactResult result = reactAgentService.run(request.message());
+        return new ReactResponse(result.task(), result.answer(), result.steps(), result.agentMessages());
+    }
+
+    @PostMapping("/stateful/react")
+    @Operation(summary = "Run a task through the LangGraph4j ReACT agent with checkpoint persistence",
+            description = "Like /react, but checkpoints the graph state after each run using a thread-based "
+                    + "MemorySaver. Pass conversationId as the session ID to resume; omit to start a new session. "
+                    + "Returns the step trace, answer, and full checkpoint history for the session.")
+    @ApiResponse(responseCode = "200", description = "The stateful pipeline result with checkpoint history",
+            content = @Content(schema = @Schema(implementation = StatefulReactResponse.class)))
+    public StatefulReactResponse statefulReact(@RequestBody ChatRequest request) {
+        StatefulPipelineService.StatefulResult result = statefulPipelineService.run(
+                request.conversationId(), request.message());
+        List<StatefulReactResponse.StateEntry> historyEntries = result.history().stream()
+                .map(h -> new StatefulReactResponse.StateEntry(h.sessionId(), h.node(), h.lastAiMessage(), h.messageCount()))
+                .toList();
+        return new StatefulReactResponse(
+                result.sessionId(),
+                result.task(),
+                result.answer(),
+                result.steps(),
+                result.checkpointCount(),
+                historyEntries);
+    }
+
+    @PostMapping("/hitl/react")
+    @Operation(summary = "Start a human-in-the-loop ReACT run",
+            description = "Runs the task through the LangGraph4j AgentExecutor with an interrupt before every "
+                    + "tool execution. When the agent proposes a tool call, the graph pauses and returns "
+                    + "awaitingApproval=true with the proposed action. Review it, then POST /api/hitl/react/resume.")
+    @ApiResponse(responseCode = "200", description = "The HITL result (may be awaiting approval)",
+            content = @Content(schema = @Schema(implementation = HitlResponse.class)))
+    public HitlResponse hitlStart(@RequestBody ChatRequest request) {
+        HitlResult result = humanInTheLoopService.start(request.conversationId(), request.message());
+        return toHitlResponse(result);
+    }
+
+    @PostMapping("/hitl/react/resume")
+    @Operation(summary = "Resume (approve or reject) a paused human-in-the-loop run",
+            description = "Resumes a graph paused before a tool execution. Set approved=true to execute the "
+                    + "proposed action, or false to reject; feedback is recorded either way. The run may pause "
+                    + "again if the agent proposes another tool call.")
+    @ApiResponse(responseCode = "200", description = "The HITL result after resuming",
+            content = @Content(schema = @Schema(implementation = HitlResponse.class)))
+    public HitlResponse hitlResume(@RequestBody HitlResumeRequest request) {
+        HitlResult result = humanInTheLoopService.resume(
+                request.sessionId(), request.approved(), request.feedback());
+        return toHitlResponse(result);
+    }
+
+    private HitlResponse toHitlResponse(HitlResult result) {
+        return new HitlResponse(result.sessionId(), result.task(), result.answer(), result.steps(),
+                result.awaitingApproval(), result.proposedAction(), result.feedback());
     }
 
     /**

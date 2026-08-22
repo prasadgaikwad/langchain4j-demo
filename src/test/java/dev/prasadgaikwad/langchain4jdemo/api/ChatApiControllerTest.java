@@ -9,6 +9,13 @@ import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowPipelineResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService.ReactResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService.StatefulResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService.StateEntry;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.HumanInTheLoopService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.HumanInTheLoopService.HitlResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import org.junit.jupiter.api.Test;
@@ -61,6 +68,15 @@ class ChatApiControllerTest {
 
     @MockitoBean
     WorkflowOfAgentsService workflowOfAgentsService;
+
+    @MockitoBean
+    ReactAgentService reactAgentService;
+
+    @MockitoBean
+    StatefulPipelineService statefulPipelineService;
+
+    @MockitoBean
+    HumanInTheLoopService humanInTheLoopService;
 
     @Autowired
     ConversationHistoryService historyService;
@@ -229,6 +245,77 @@ class ChatApiControllerTest {
                 .andExpect(jsonPath("$.category").value("technical"))
                 .andExpect(jsonPath("$.executedAgents").isArray())
                 .andExpect(jsonPath("$.executedAgents.length()").value(7));
+    }
+
+    @Test
+    void reactReturnsAgentResultWithSteps() throws Exception {
+        when(reactAgentService.run("compute 2+2")).thenReturn(
+                new ReactResult("compute 2+2", "The answer is 4.",
+                        List.of("agent", "action", "agent"),
+                        List.of("I need to calculate 2+2.", "4.0", "The answer is 4.")));
+
+        mockMvc.perform(post("/api/react")
+                        .contentType("application/json")
+                        .content("{\"message\":\"compute 2+2\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.task").value("compute 2+2"))
+                .andExpect(jsonPath("$.answer").value("The answer is 4."))
+                .andExpect(jsonPath("$.steps").isArray())
+                .andExpect(jsonPath("$.steps.length()").value(3))
+                .andExpect(jsonPath("$.agentMessages").isArray())
+                .andExpect(jsonPath("$.agentMessages.length()").value(3));
+    }
+
+    @Test
+    void statefulReactReturnsCheckpointHistory() throws Exception {
+        when(statefulPipelineService.run("api", "compute 2+2")).thenReturn(
+                new StatefulResult("session-abc", "compute 2+2", "The answer is 4.",
+                        List.of("agent", "action", "agent"), 3,
+                        List.of(new StateEntry("session-abc", "agent", "Thinking...", 1),
+                                new StateEntry("session-abc", "action", "4.0", 2),
+                                new StateEntry("session-abc", "__END__", "The answer is 4.", 3))));
+
+        mockMvc.perform(post("/api/stateful/react")
+                        .contentType("application/json")
+                        .content("{\"message\":\"compute 2+2\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionId").value("session-abc"))
+                .andExpect(jsonPath("$.task").value("compute 2+2"))
+                .andExpect(jsonPath("$.answer").value("The answer is 4."))
+                .andExpect(jsonPath("$.checkpointCount").value(3))
+                .andExpect(jsonPath("$.history").isArray())
+                .andExpect(jsonPath("$.history.length()").value(3));
+    }
+
+    @Test
+    void hitlStartReturnsAwaitingApprovalWhenPaused() throws Exception {
+        when(humanInTheLoopService.start("api", "check the weather")).thenReturn(
+                new HitlResult("session-abc", "check the weather", "",
+                        List.of("agent"), true, "I want to call weather_tool(Tokyo)", null));
+
+        mockMvc.perform(post("/api/hitl/react")
+                        .contentType("application/json")
+                        .content("{\"message\":\"check the weather\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionId").value("session-abc"))
+                .andExpect(jsonPath("$.awaitingApproval").value(true))
+                .andExpect(jsonPath("$.proposedAction").value("I want to call weather_tool(Tokyo)"))
+                .andExpect(jsonPath("$.steps.length()").value(1));
+    }
+
+    @Test
+    void hitlResumeReturnsFinalAnswerAfterApproval() throws Exception {
+        when(humanInTheLoopService.resume("session-abc", true, null)).thenReturn(
+                new HitlResult("session-abc", "(approved)", "The weather in Tokyo is 22C.",
+                        List.of("agent", "action", "agent"), false, "", ""));
+
+        mockMvc.perform(post("/api/hitl/react/resume")
+                        .contentType("application/json")
+                        .content("{\"sessionId\":\"session-abc\",\"approved\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.awaitingApproval").value(false))
+                .andExpect(jsonPath("$.answer").value("The weather in Tokyo is 22C."))
+                .andExpect(jsonPath("$.steps.length()").value(3));
     }
 
     @Test
