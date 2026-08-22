@@ -10,6 +10,8 @@ import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowPipelineResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService.ReactResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,6 +49,7 @@ public class ChatApiController {
     private final ChainOfAgentsService chainOfAgentsService;
     private final GraphOfAgentsService graphOfAgentsService;
     private final WorkflowOfAgentsService workflowOfAgentsService;
+    private final ReactAgentService reactAgentService;
 
     public ChatApiController(Assistant assistant,
                              QaService qaService,
@@ -56,7 +59,8 @@ public class ChatApiController {
                              JsonMapper objectMapper,
                              ChainOfAgentsService chainOfAgentsService,
                              GraphOfAgentsService graphOfAgentsService,
-                             WorkflowOfAgentsService workflowOfAgentsService) {
+                             WorkflowOfAgentsService workflowOfAgentsService,
+                             ReactAgentService reactAgentService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chainService = chainService;
@@ -66,6 +70,7 @@ public class ChatApiController {
         this.chainOfAgentsService = chainOfAgentsService;
         this.graphOfAgentsService = graphOfAgentsService;
         this.workflowOfAgentsService = workflowOfAgentsService;
+        this.reactAgentService = reactAgentService;
     }
 
     @PostMapping("/chat")
@@ -160,6 +165,18 @@ public class ChatApiController {
                 result.edited(),
                 result.writeup(),
                 result.agentPath());
+    }
+
+    @PostMapping("/react")
+    @Operation(summary = "Run a task through the LangGraph4j ReACT agent executor",
+            description = "Runs the task through an explicit agent→action→agent state graph built with "
+                    + "LangGraph4j's AgentExecutor. The LLM reasons, selects tools, observes results, "
+                    + "and iterates until it produces a final answer. Returns the graph step trace and answer.")
+    @ApiResponse(responseCode = "200", description = "The ReACT agent result with step trace",
+            content = @Content(schema = @Schema(implementation = ReactResponse.class)))
+    public ReactResponse react(@RequestBody ChatRequest request) {
+        ReactResult result = reactAgentService.run(request.message());
+        return new ReactResponse(result.task(), result.answer(), result.steps(), result.agentMessages());
     }
 
     /**

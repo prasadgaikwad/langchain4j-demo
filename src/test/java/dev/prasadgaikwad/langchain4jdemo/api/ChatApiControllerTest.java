@@ -9,6 +9,8 @@ import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.GraphPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowPipelineResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService.ReactResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import org.junit.jupiter.api.Test;
@@ -61,6 +63,9 @@ class ChatApiControllerTest {
 
     @MockitoBean
     WorkflowOfAgentsService workflowOfAgentsService;
+
+    @MockitoBean
+    ReactAgentService reactAgentService;
 
     @Autowired
     ConversationHistoryService historyService;
@@ -229,6 +234,25 @@ class ChatApiControllerTest {
                 .andExpect(jsonPath("$.category").value("technical"))
                 .andExpect(jsonPath("$.executedAgents").isArray())
                 .andExpect(jsonPath("$.executedAgents.length()").value(7));
+    }
+
+    @Test
+    void reactReturnsAgentResultWithSteps() throws Exception {
+        when(reactAgentService.run("compute 2+2")).thenReturn(
+                new ReactResult("compute 2+2", "The answer is 4.",
+                        List.of("agent", "action", "agent"),
+                        List.of("I need to calculate 2+2.", "4.0", "The answer is 4.")));
+
+        mockMvc.perform(post("/api/react")
+                        .contentType("application/json")
+                        .content("{\"message\":\"compute 2+2\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.task").value("compute 2+2"))
+                .andExpect(jsonPath("$.answer").value("The answer is 4."))
+                .andExpect(jsonPath("$.steps").isArray())
+                .andExpect(jsonPath("$.steps.length()").value(3))
+                .andExpect(jsonPath("$.agentMessages").isArray())
+                .andExpect(jsonPath("$.agentMessages.length()").value(3));
     }
 
     @Test
