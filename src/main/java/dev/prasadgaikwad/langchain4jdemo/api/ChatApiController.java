@@ -14,6 +14,8 @@ import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService.ReactResult;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService.StatefulResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.HumanInTheLoopService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.HumanInTheLoopService.HitlResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -54,6 +56,7 @@ public class ChatApiController {
     private final WorkflowOfAgentsService workflowOfAgentsService;
     private final ReactAgentService reactAgentService;
     private final StatefulPipelineService statefulPipelineService;
+    private final HumanInTheLoopService humanInTheLoopService;
 
     public ChatApiController(Assistant assistant,
                              QaService qaService,
@@ -65,7 +68,8 @@ public class ChatApiController {
                              GraphOfAgentsService graphOfAgentsService,
                              WorkflowOfAgentsService workflowOfAgentsService,
                              ReactAgentService reactAgentService,
-                             StatefulPipelineService statefulPipelineService) {
+                             StatefulPipelineService statefulPipelineService,
+                             HumanInTheLoopService humanInTheLoopService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chainService = chainService;
@@ -77,6 +81,7 @@ public class ChatApiController {
         this.workflowOfAgentsService = workflowOfAgentsService;
         this.reactAgentService = reactAgentService;
         this.statefulPipelineService = statefulPipelineService;
+        this.humanInTheLoopService = humanInTheLoopService;
     }
 
     @PostMapping("/chat")
@@ -205,6 +210,36 @@ public class ChatApiController {
                 result.steps(),
                 result.checkpointCount(),
                 historyEntries);
+    }
+
+    @PostMapping("/hitl/react")
+    @Operation(summary = "Start a human-in-the-loop ReACT run",
+            description = "Runs the task through the LangGraph4j AgentExecutor with an interrupt before every "
+                    + "tool execution. When the agent proposes a tool call, the graph pauses and returns "
+                    + "awaitingApproval=true with the proposed action. Review it, then POST /api/hitl/react/resume.")
+    @ApiResponse(responseCode = "200", description = "The HITL result (may be awaiting approval)",
+            content = @Content(schema = @Schema(implementation = HitlResponse.class)))
+    public HitlResponse hitlStart(@RequestBody ChatRequest request) {
+        HitlResult result = humanInTheLoopService.start(request.conversationId(), request.message());
+        return toHitlResponse(result);
+    }
+
+    @PostMapping("/hitl/react/resume")
+    @Operation(summary = "Resume (approve or reject) a paused human-in-the-loop run",
+            description = "Resumes a graph paused before a tool execution. Set approved=true to execute the "
+                    + "proposed action, or false to reject; feedback is recorded either way. The run may pause "
+                    + "again if the agent proposes another tool call.")
+    @ApiResponse(responseCode = "200", description = "The HITL result after resuming",
+            content = @Content(schema = @Schema(implementation = HitlResponse.class)))
+    public HitlResponse hitlResume(@RequestBody HitlResumeRequest request) {
+        HitlResult result = humanInTheLoopService.resume(
+                request.sessionId(), request.approved(), request.feedback());
+        return toHitlResponse(result);
+    }
+
+    private HitlResponse toHitlResponse(HitlResult result) {
+        return new HitlResponse(result.sessionId(), result.task(), result.answer(), result.steps(),
+                result.awaitingApproval(), result.proposedAction(), result.feedback());
     }
 
     /**

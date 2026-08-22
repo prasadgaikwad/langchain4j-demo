@@ -14,6 +14,8 @@ import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService.ReactRe
 import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService.StatefulResult;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService.StateEntry;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.HumanInTheLoopService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.HumanInTheLoopService.HitlResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import org.junit.jupiter.api.Test;
@@ -72,6 +74,9 @@ class ChatApiControllerTest {
 
     @MockitoBean
     StatefulPipelineService statefulPipelineService;
+
+    @MockitoBean
+    HumanInTheLoopService humanInTheLoopService;
 
     @Autowired
     ConversationHistoryService historyService;
@@ -280,6 +285,37 @@ class ChatApiControllerTest {
                 .andExpect(jsonPath("$.checkpointCount").value(3))
                 .andExpect(jsonPath("$.history").isArray())
                 .andExpect(jsonPath("$.history.length()").value(3));
+    }
+
+    @Test
+    void hitlStartReturnsAwaitingApprovalWhenPaused() throws Exception {
+        when(humanInTheLoopService.start("api", "check the weather")).thenReturn(
+                new HitlResult("session-abc", "check the weather", "",
+                        List.of("agent"), true, "I want to call weather_tool(Tokyo)", null));
+
+        mockMvc.perform(post("/api/hitl/react")
+                        .contentType("application/json")
+                        .content("{\"message\":\"check the weather\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionId").value("session-abc"))
+                .andExpect(jsonPath("$.awaitingApproval").value(true))
+                .andExpect(jsonPath("$.proposedAction").value("I want to call weather_tool(Tokyo)"))
+                .andExpect(jsonPath("$.steps.length()").value(1));
+    }
+
+    @Test
+    void hitlResumeReturnsFinalAnswerAfterApproval() throws Exception {
+        when(humanInTheLoopService.resume("session-abc", true, null)).thenReturn(
+                new HitlResult("session-abc", "(approved)", "The weather in Tokyo is 22C.",
+                        List.of("agent", "action", "agent"), false, "", ""));
+
+        mockMvc.perform(post("/api/hitl/react/resume")
+                        .contentType("application/json")
+                        .content("{\"sessionId\":\"session-abc\",\"approved\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.awaitingApproval").value(false))
+                .andExpect(jsonPath("$.answer").value("The weather in Tokyo is 22C."))
+                .andExpect(jsonPath("$.steps.length()").value(3));
     }
 
     @Test
