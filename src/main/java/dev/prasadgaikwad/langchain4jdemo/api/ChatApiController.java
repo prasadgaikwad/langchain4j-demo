@@ -12,6 +12,8 @@ import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowPipelineResult;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService.ReactResult;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService.StatefulResult;
 import dev.prasadgaikwad.langchain4jdemo.rag.QaService;
 import dev.prasadgaikwad.langchain4jdemo.streaming.ChatStreamingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * REST endpoints for chat, RAG, and the tool-using agent, plus a Server-Sent
@@ -50,6 +53,7 @@ public class ChatApiController {
     private final GraphOfAgentsService graphOfAgentsService;
     private final WorkflowOfAgentsService workflowOfAgentsService;
     private final ReactAgentService reactAgentService;
+    private final StatefulPipelineService statefulPipelineService;
 
     public ChatApiController(Assistant assistant,
                              QaService qaService,
@@ -60,7 +64,8 @@ public class ChatApiController {
                              ChainOfAgentsService chainOfAgentsService,
                              GraphOfAgentsService graphOfAgentsService,
                              WorkflowOfAgentsService workflowOfAgentsService,
-                             ReactAgentService reactAgentService) {
+                             ReactAgentService reactAgentService,
+                             StatefulPipelineService statefulPipelineService) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chainService = chainService;
@@ -71,6 +76,7 @@ public class ChatApiController {
         this.graphOfAgentsService = graphOfAgentsService;
         this.workflowOfAgentsService = workflowOfAgentsService;
         this.reactAgentService = reactAgentService;
+        this.statefulPipelineService = statefulPipelineService;
     }
 
     @PostMapping("/chat")
@@ -177,6 +183,28 @@ public class ChatApiController {
     public ReactResponse react(@RequestBody ChatRequest request) {
         ReactResult result = reactAgentService.run(request.message());
         return new ReactResponse(result.task(), result.answer(), result.steps(), result.agentMessages());
+    }
+
+    @PostMapping("/stateful/react")
+    @Operation(summary = "Run a task through the LangGraph4j ReACT agent with checkpoint persistence",
+            description = "Like /react, but checkpoints the graph state after each run using a thread-based "
+                    + "MemorySaver. Pass conversationId as the session ID to resume; omit to start a new session. "
+                    + "Returns the step trace, answer, and full checkpoint history for the session.")
+    @ApiResponse(responseCode = "200", description = "The stateful pipeline result with checkpoint history",
+            content = @Content(schema = @Schema(implementation = StatefulReactResponse.class)))
+    public StatefulReactResponse statefulReact(@RequestBody ChatRequest request) {
+        StatefulPipelineService.StatefulResult result = statefulPipelineService.run(
+                request.conversationId(), request.message());
+        List<StatefulReactResponse.StateEntry> historyEntries = result.history().stream()
+                .map(h -> new StatefulReactResponse.StateEntry(h.sessionId(), h.node(), h.lastAiMessage(), h.messageCount()))
+                .toList();
+        return new StatefulReactResponse(
+                result.sessionId(),
+                result.task(),
+                result.answer(),
+                result.steps(),
+                result.checkpointCount(),
+                historyEntries);
     }
 
     /**

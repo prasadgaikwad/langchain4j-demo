@@ -33,6 +33,7 @@ flowchart LR
         GRAPH_AGENTS[GraphOfAgentsService\nGOAP planner pipeline]
         WORKFLOW[WorkflowOfAgentsService\nparallel/loop/conditional]
         REACT_LG[ReactAgentService\nLangGraph4j ReACT]
+        STATEFUL[StatefulPipelineService\ncheckpoint persistence]
     end
 
     subgraph Models["LangChain4j model layer"]
@@ -63,6 +64,7 @@ flowchart LR
     GRAPH_AGENTS --> MOD
     WORKFLOW --> MOD
     REACT_LG --> MOD
+    STATEFUL --> MOD
     CHAIN --> AS
     EVAL --> AS
     MOD --> CM
@@ -130,6 +132,7 @@ runtime switches **every** AI service (assistant, RAG, agent, judge, crew).
 | 36 | [graph-of-agents-goap](36-graph-of-agents-goap.md) | Goal-oriented agent graph via `plannerBuilder()` + `GoalOrientedPlanner` |
 | 37 | [workflow-composition](37-workflow-composition.md) | Parallel, loop, and conditional workflow patterns via `AgenticServices` |
 | 38 | [langgraph4j-react-agent](38-langgraph4j-react-agent.md) | LangGraph4j ReACT agent executor — stateful agent→action→agent loop |
+| 39 | [langgraph4j-stateful-pipeline](39-langgraph4j-stateful-pipeline.md) | LangGraph4j stateful pipeline — checkpoint persistence and session history |
 
 ### G. Streaming & web layer
 | # | Doc | One-liner |
