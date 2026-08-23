@@ -103,6 +103,7 @@ graph-of-agents GOAP).
 /workflow <topic>         Generate a blog post via parallel/loop/conditional workflow
 /react <task>             Run a task with the LangGraph4j ReACT agent executor
 /stateful <task>          Run a task with checkpoint persistence (multi-turn session)
+/hitl <task>              Run with human-in-the-loop: approve/reject each tool call
 /stream <task>              Stream a task with streaming function calling
 /describe <url> [question]  Ask a multimodal model about an image
 /generate <prompt>          Generate an image from a text prompt
@@ -159,6 +160,8 @@ SSE + WebSocket chat client).
 | POST   | `/api/workflow`       | Run a parallel/loop/conditional workflow pipeline (`{message}` topic; returns trace + category) |
 | POST   | `/api/react`          | Run a task with the LangGraph4j ReACT agent executor (`{message}` task; returns graph step trace) |
 | POST   | `/api/stateful/react` | ReACT with checkpoint persistence (`{message}` + optional `conversationId`; returns session + history) |
+| POST   | `/api/hitl/react`     | Start human-in-the-loop ReACT run (pauses before tool calls for approval) |
+| POST   | `/api/hitl/react/resume` | Approve/reject a paused HITL run (`{sessionId, approved, feedback?}`) |
 | GET    | `/api/chat/stream`    | Stream a chat reply over Server-Sent Events (`?message=&conversationId=`; each token is a JSON string) |
 | POST   | `/api/sentiment`      | Sentiment classification (`{text}`)                      |
 | POST   | `/api/movie`          | Extract structured movie data (`{text}`)                 |
@@ -207,6 +210,7 @@ every conversation held through the REST API.
 15. **Workflow Composition** — parallel research (fan-out), iterative draft refinement (loop with exit condition), topic classification, and conditional formatting composed from `parallelBuilder()`, `loopBuilder()`, `conditionalBuilder()`, and `sequenceBuilder()`
 16. **LangGraph4j ReACT Agent** — explicit agent→action→agent state graph built with LangGraph4j's `AgentExecutor`, with a full node-transition trace of the ReACT loop
 17. **LangGraph4j Stateful Pipeline** — checkpoint-persisted ReACT pipeline using `MemorySaver` + `RunnableConfig` thread IDs, with session-based conversation history
+18. **LangGraph4j Human-in-the-Loop** — `interruptBefore("action")` pauses the graph before every tool call; humans approve or reject each proposed action before it executes
 
 ## Getting Started
 1. Clone the repository
