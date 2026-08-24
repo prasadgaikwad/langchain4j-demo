@@ -59,6 +59,14 @@ String answer = result.get().finalResponse().orElse("No response");
 - `toolsFromObject()` takes `Object...` — pass tools directly, not wrapped in lists
 - `AsyncGenerator.forEachRemaining()` does not exist; iterate with a for-each loop or stream
 - `AgentExecutor.State` messages include ALL intermediate steps, not just the final exchange
+- **Never call both `stream()` and `invoke()` for one request** — that executes the whole graph
+  (LLM + tools) twice. Stream once and capture the final state from the last emitted output.
+- **Pure tool-call AiMessages have `text() == null`** — mapping every message to `text()` yields
+  nulls. Build the trace from three sources: AI text, `toolExecutionRequests()` (name + arguments),
+  and `ToolExecutionResultMessage.text()`.
+- **Without a system instruction the agent retries failing tools indefinitely** — add a system
+  message ("do not retry a failed tool more than once") and set `recursionLimit` on CompileConfig
+  so runaway loops stop deterministically.
 
 ## Recommendation
 
