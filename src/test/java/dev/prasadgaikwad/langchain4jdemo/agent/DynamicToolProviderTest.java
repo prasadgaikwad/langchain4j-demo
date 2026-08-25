@@ -92,7 +92,7 @@ class DynamicToolProviderTest {
                         .anyMatch(specification -> specification.name().equals("getWeather"));
                 String toolName = hasWeatherTool ? "getWeather" : "calculate";
                 String arguments = hasWeatherTool
-                        ? "{\"request\":{\"city\":\"London\",\"unit\":\"CELSIUS\"}}"
+                        ? "{\"city\":\"London\",\"unit\":\"CELSIUS\"}"
                         : "{\"expression\":\"2 + 3\"}";
                 ToolExecutionRequest toolCall = ToolExecutionRequest.builder()
                         .name(toolName)
