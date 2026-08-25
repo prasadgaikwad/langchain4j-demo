@@ -15,12 +15,16 @@ the agent proposes an action, the graph pauses, a human reviews, and the graph r
    `"agent"`, `ACTION_LABEL` = `"action"`, `END_LABEL` = `"end"`. The AgentExecutor builds
    its graph with exactly these node names.
 
-3. **Detecting a pause**: after `invoke()`/`stream()`, call
-   `compiledGraph.stateOf(config)`. If `snapshot.next()` equals the interrupted node, the
-   graph is paused waiting. Otherwise the run completed normally.
+3. **Detecting a REAL approval gate** (issue #247): `snapshot.next()` equals the interrupted
+   node on *every* agent turn — the AgentExecutor wires an **unconditional** edge
+   `agent → action` (`Agent.java`), so tool-free runs park there too. A genuine gate requires
+   the parked state AND a pending proposal: the last `AiMessage` must carry
+   `ToolExecutionRequest`s (`aiMessage.hasToolExecutionRequests()`).
 
-4. **Resuming**: call `compiledGraph.stream(Map.of(), config)` with the same thread ID and
-   empty input — the graph continues from the saved checkpoint through the interrupted node.
+4. **Resuming**: call `compiledGraph.stream(null, config)` (or `invoke(null, config)`) with the
+   same thread ID — a `null` input becomes `GraphInput.resume()`, which continues at the
+   checkpoint's next node. **Any non-null input (even `Map.of()`) starts a brand-new run from
+   the entrypoint**, re-invoking the LLM instead of executing approved tools.
 
 5. **Interrupts require checkpointing** — the pause works by saving state at the interrupt
    point; without a `checkpointSaver` the resume has nothing to restore from.
@@ -39,12 +43,14 @@ var config = RunnableConfig.builder().threadId("session-1").build();
 // 1. Start — runs until the agent proposes a tool call, then pauses
 compiled.invoke(Map.of("messages", UserMessage.from(task)), config);
 var snapshot = compiled.stateOf(config).get();
-boolean paused = "action".equals(snapshot.next());  // true → awaiting approval
+var lastAi = /* last AiMessage in snapshot.state().messages() */;
+boolean gate = "action".equals(snapshot.next())          // parked...
+        && lastAi != null && lastAi.hasToolExecutionRequests(); // ...with a real proposal
 
-// 2. Human reviews snapshot.state().messages() — last AiMessage holds the proposal
+// 2. Human reviews the proposal: render lastAi.toolExecutionRequests() (name + arguments)
 
-// 3. Resume — executes the approved action, continues the loop
-compiled.invoke(Map.of(), config);
+// 3. Resume — executes the approved tools, continues the loop
+compiled.invoke(null, config);
 ```
 
 ### Why this matters
@@ -59,14 +65,22 @@ compiled.invoke(Map.of(), config);
 - `stateOf(config)` throws if no checkpoint exists for the thread — check `isPresent()` first
 - After resuming, the agent may propose *another* tool call — the approval loop must iterate
   until `awaitingApproval` is false
-- Rejecting is not built-in: to reject, either update the state with corrective feedback or
-  simply abandon the session (checkpoints are scoped per thread)
+- **`stream(null, config)` vs `stream(Map.of(), config)`**: `null` resumes; an empty map
+  starts a NEW run from the entrypoint (issue #247 — this caused infinite re-prompts)
+- **Rejection must not resume the graph**: the unconditional `agent → action` edge means a
+  resumed run would execute the unapproved tools anyway. Terminate the session in the result
+  layer instead (or rewrite state via `updateState(config, values, asNode)` with care)
+- Tool-free runs park too (unconditional edge) — auto-complete them silently with one
+  `stream(null, config)`; the action node sees no tool requests and routes to END
 - Every tool call triggers the interrupt — there is no per-tool filtering out of the box;
   implement selective gating via conditional edges on a custom graph instead
 - **Read results from `lastStateOf(config)`, never re-`invoke()`** — a second invoke with empty
   input re-runs the whole graph. The checkpoint already holds the final state.
 - `AiMessage.text()` is null for pure tool-call messages — when surfacing the proposed action,
   fall back to the tool execution requests, not just the text.
+- The `action` node writes the sentinel `"no tool execution request found!"` into
+  `agent_response` when it finishes without requests and without a prior final answer — filter
+  that string before treating `finalResponse` as the user-facing answer
 
 ## Recommendation
 
