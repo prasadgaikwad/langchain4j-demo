@@ -54,6 +54,9 @@ for (var snapshot : history) {
 - `getStateHistory()` returns snapshots in reverse chronological order (newest first)
 - Thread IDs must be unique per session — collisions overwrite checkpoints
 - The `AgentExecutor.State` checkpoint includes ALL messages (user + AI + tool), which can grow large
+- **Read the outcome with `lastStateOf(config)`, never a second `invoke()`** — invoking again with
+  empty input re-runs the graph. `lastStateOf` returns the final `StateSnapshot` from the
+  checkpoint without any execution.
 
 ## Recommendation
 

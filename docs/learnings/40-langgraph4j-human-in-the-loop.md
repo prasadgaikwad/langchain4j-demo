@@ -63,6 +63,10 @@ compiled.invoke(Map.of(), config);
   simply abandon the session (checkpoints are scoped per thread)
 - Every tool call triggers the interrupt — there is no per-tool filtering out of the box;
   implement selective gating via conditional edges on a custom graph instead
+- **Read results from `lastStateOf(config)`, never re-`invoke()`** — a second invoke with empty
+  input re-runs the whole graph. The checkpoint already holds the final state.
+- `AiMessage.text()` is null for pure tool-call messages — when surfacing the proposed action,
+  fall back to the tool execution requests, not just the text.
 
 ## Recommendation
 

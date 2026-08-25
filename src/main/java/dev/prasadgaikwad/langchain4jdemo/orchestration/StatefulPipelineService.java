@@ -1,6 +1,7 @@
 package dev.prasadgaikwad.langchain4jdemo.orchestration;
 
 import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.prasadgaikwad.langchain4jdemo.agent.CalculatorTool;
@@ -8,11 +9,11 @@ import dev.prasadgaikwad.langchain4jdemo.agent.DocumentSearchTool;
 import dev.prasadgaikwad.langchain4jdemo.agent.EmbeddingStoreStatsTool;
 import dev.prasadgaikwad.langchain4jdemo.agent.WeatherTool;
 import org.bsc.langgraph4j.CompileConfig;
-import org.bsc.langgraph4j.agentexecutor.AgentExecutor;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.StateGraph;
+import org.bsc.langgraph4j.agentexecutor.AgentExecutor;
 import org.bsc.langgraph4j.checkpoint.MemorySaver;
 import org.bsc.langgraph4j.state.StateSnapshot;
 import org.springframework.stereotype.Service;
@@ -21,30 +22,30 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class StatefulPipelineService {
 
+    private static final int MAX_ITERATIONS = 8;
+
     private final CompiledGraph<AgentExecutor.State> compiledGraph;
-    private final MemorySaver memorySaver;
 
     public StatefulPipelineService(ChatModel chatModel,
                                    CalculatorTool calculatorTool,
                                    DocumentSearchTool documentSearchTool,
                                    WeatherTool weatherTool,
                                    EmbeddingStoreStatsTool storeStatsTool) throws GraphStateException {
-        this.memorySaver = new MemorySaver();
-
         StateGraph<AgentExecutor.State> graph = AgentExecutor.builder()
                 .chatModel(chatModel)
+                .systemMessage(SystemMessage.from(ReactAgentService.SYSTEM_MESSAGE))
                 .toolsFromObject(calculatorTool, documentSearchTool, weatherTool, storeStatsTool)
                 .build();
 
         this.compiledGraph = graph.compile(
                 CompileConfig.builder()
-                        .checkpointSaver(memorySaver)
+                        .checkpointSaver(new MemorySaver())
+                        .recursionLimit(MAX_ITERATIONS)
                         .build());
     }
 
@@ -59,21 +60,32 @@ public class StatefulPipelineService {
                 .build();
 
         List<String> steps = new ArrayList<>();
+        AgentExecutor.State lastState = null;
 
         var generator = compiledGraph.stream(Map.of("messages", UserMessage.from(task)), config);
-        for (var item : generator) {
-            String nodeName = item.node();
-            if (!"__START__".equals(nodeName) && !"__END__".equals(nodeName)) {
-                steps.add(nodeName);
+        try {
+            for (var item : generator) {
+                String nodeName = item.node();
+                if (!"__START__".equals(nodeName) && !"__END__".equals(nodeName)) {
+                    steps.add(nodeName);
+                }
+                lastState = item.state();
+            }
+        } catch (RuntimeException e) {
+            if (lastState == null && steps.isEmpty()) {
+                throw e;
             }
         }
 
-        Optional<AgentExecutor.State> finalState = compiledGraph.invoke(
-                Map.of("messages", UserMessage.from(task)), config);
+        String answer = ReactAgentService.answerOf(lastState);
 
-        String answer = finalState
-                .flatMap(AgentExecutor.State::finalResponse)
-                .orElse("No response");
+        // Fall back to the persisted checkpoint state when the stream produced nothing usable.
+        if (answer.equals("No response")) {
+            lastState = compiledGraph.lastStateOf(config)
+                    .map(StateSnapshot::state)
+                    .orElse(null);
+            answer = ReactAgentService.answerOf(lastState);
+        }
 
         List<StateEntry> history = getStateHistory(threadId);
 
@@ -91,16 +103,16 @@ public class StatefulPipelineService {
         List<StateEntry> entries = new ArrayList<>();
         for (StateSnapshot<AgentExecutor.State> snapshot : snapshots) {
             AgentExecutor.State state = snapshot.state();
-            List<String> messages = state.messages().stream()
-                    .filter(m -> m instanceof AiMessage)
+            String lastMessage = state.messages().stream()
+                    .filter(m -> m instanceof AiMessage ai && ai.text() != null && !ai.text().isBlank())
                     .map(m -> ((AiMessage) m).text())
-                    .toList();
-            String lastMessage = messages.isEmpty() ? "" : messages.get(messages.size() - 1);
+                    .reduce((first, second) -> second)
+                    .orElse("");
             entries.add(new StateEntry(
                     snapshot.config().threadId().orElse(sessionId),
                     snapshot.node(),
                     lastMessage,
-                    messages.size()));
+                    state.messages().size()));
         }
         return entries;
     }
