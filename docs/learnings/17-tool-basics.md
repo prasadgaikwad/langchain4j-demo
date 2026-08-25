@@ -49,6 +49,10 @@ sequenceDiagram
   (→ 22) so the model isn't even invoked for pure math.
 - Tools can be static or instance methods, any visibility, and can return any type
   (non-String returns are JSON-serialized back to the model).
+- **Keep tool parameters flat** — a nested POJO parameter (`getWeather(WeatherRequest)`)
+  binds as `null` under real LLM calls because models emit flat argument JSON while
+  executors expect it wrapped; the failure is silent (NPE inside the tool body, not a
+  tool error). Use flat `@P`-annotated params + enums instead (issue #245).
 
 ## Related files
 - `agent/CalculatorTool.java`, `config/AiConfig.java`, `ai/Agent.java`,
