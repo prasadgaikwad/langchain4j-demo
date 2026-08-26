@@ -66,6 +66,10 @@ public class ChatCli implements CommandLineRunner {
     private static final String KNOWN_EMBEDDING_MODELS =
             "text-embedding-3-small | text-embedding-3-large | text-embedding-ada-002";
 
+    // Single shared stdin scanner: creating new Scanners per prompt would race
+    // with the REPL loop's buffered input.
+    private Scanner scanner;
+
     private final Assistant assistant;
     private final QaService qaService;
     private final ChatMemoryRegistry chatMemoryRegistry;
@@ -160,10 +164,10 @@ public class ChatCli implements CommandLineRunner {
     public void run(String... args) {
         printHelp();
 
-        try (Scanner scanner = new Scanner(System.in)) {
+        try (Scanner replScanner = this.scanner = new Scanner(System.in)) {
             while (true) {
                 System.out.print("You > ");
-                String input = scanner.nextLine().trim();
+                String input = replScanner.nextLine().trim();
 
                 if (input.isEmpty()) {
                     continue;
@@ -488,13 +492,13 @@ public class ChatCli implements CommandLineRunner {
             System.out.println(result.proposedAction());
             System.out.println();
             System.out.print("Approve? [y/n] ");
-            String answer = new java.util.Scanner(System.in).nextLine().trim().toLowerCase();
+            String answer = scanner.nextLine().trim().toLowerCase();
 
             boolean approved = answer.startsWith("y");
             String feedback = "";
             if (!approved) {
                 System.out.print("Feedback: ");
-                feedback = new java.util.Scanner(System.in).nextLine().trim();
+                feedback = scanner.nextLine().trim();
             }
 
             result = humanInTheLoopService.resume(currentHitlSessionId, approved, feedback);

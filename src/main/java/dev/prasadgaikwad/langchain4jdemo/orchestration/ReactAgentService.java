@@ -76,7 +76,11 @@ public class ReactAgentService {
         if (state == null) {
             return "No response";
         }
-        return state.finalResponse()
+        // executeTool writes this sentinel into agent_response when a run ends
+        // without tool requests and without a final answer — not a real answer.
+        var finalResponse = state.finalResponse()
+                .filter(text -> !"no tool execution request found!".equals(text));
+        return finalResponse
                 .or(() -> lastTextOf(state))
                 .orElse("No response");
     }
