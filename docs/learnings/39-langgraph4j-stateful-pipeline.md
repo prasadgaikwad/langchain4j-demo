@@ -44,7 +44,8 @@ for (var snapshot : history) {
 ### Why checkpointing matters
 
 - **Resume after failure** — if a long-running pipeline crashes, replay from last checkpoint
-- **Multi-turn conversations** — each turn builds on previous checkpoints within the same thread
+- **Multi-turn conversations** — keep session continuity by seeding each fresh thread with the
+  previous run's transcript (see pitfalls: one-thread-per-conversation breaks ReACT loops)
 - **Audit trail** — every intermediate state is recorded, enabling debugging and compliance
 - **Human-in-the-loop** — pause at a checkpoint, inspect state, then resume (issue #237)
 
@@ -57,6 +58,13 @@ for (var snapshot : history) {
 - **Read the outcome with `lastStateOf(config)`, never a second `invoke()`** — invoking again with
   empty input re-runs the graph. `lastStateOf` returns the final `StateSnapshot` from the
   checkpoint without any execution.
+- **Do NOT stream multiple conversational turns into one thread** (issue #249): plain state
+  values persist across runs, and `AgentExecutor.State.FINAL_RESPONSE` ("agent_response")
+  short-circuits the tool node straight to END once set (`AgentExecutor.java:116`). Turn 2+
+  executes tools but never synthesizes — the answer stays frozen at turn 1's text.
+  Fix: fresh thread per run, seeded with the previous run's transcript
+- ReACT rounds consume ~3 recursion steps (agent → action → agent), so size
+  `recursionLimit` accordingly (e.g. iterations × 2)
 
 ## Recommendation
 

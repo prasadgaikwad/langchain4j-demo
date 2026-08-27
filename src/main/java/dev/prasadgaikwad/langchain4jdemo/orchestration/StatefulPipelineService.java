@@ -1,6 +1,7 @@
 package dev.prasadgaikwad.langchain4jdemo.orchestration;
 
 import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
@@ -23,13 +24,28 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * ReACT agent with conversational sessions over langgraph4j checkpoints.
+ *
+ * <p>Each {@link #run} executes on a <b>fresh graph thread</b>
+ * ({@code sessionId:runUuid}). The persisted {@code agent_response} value
+ * short-circuits AgentExecutor's tool node straight to END once it is set, so
+ * reusing one thread across turns froze every later answer at the first
+ * turn's text (issue #249). Conversation continuity is preserved instead by
+ * seeding each new run's {@code messages} channel with the previous run's
+ * transcript plus the new user message.</p>
+ */
 @Service
 public class StatefulPipelineService {
 
     private static final int MAX_ITERATIONS = 8;
 
     private final CompiledGraph<AgentExecutor.State> compiledGraph;
+
+    /** Session id -> thread id of that session's most recent run. */
+    private final Map<String, String> latestThreadBySession = new ConcurrentHashMap<>();
 
     public StatefulPipelineService(ChatModel chatModel,
                                    CalculatorTool calculatorTool,
@@ -45,7 +61,7 @@ public class StatefulPipelineService {
         this.compiledGraph = graph.compile(
                 CompileConfig.builder()
                         .checkpointSaver(new MemorySaver())
-                        .recursionLimit(MAX_ITERATIONS)
+                        .recursionLimit(MAX_ITERATIONS * 2)
                         .build());
     }
 
@@ -53,7 +69,12 @@ public class StatefulPipelineService {
         if (sessionId == null || sessionId.isBlank()) {
             sessionId = UUID.randomUUID().toString();
         }
-        final String threadId = sessionId;
+        // A fresh thread starts with agent_response unset, so this run gets a
+        // complete ReACT loop (tool execution -> agent synthesis).
+        final String threadId = sessionId + ":" + UUID.randomUUID();
+
+        List<ChatMessage> input = new ArrayList<>(priorMessages(sessionId));
+        input.add(UserMessage.from(task));
 
         RunnableConfig config = RunnableConfig.builder()
                 .threadId(threadId)
@@ -62,7 +83,7 @@ public class StatefulPipelineService {
         List<String> steps = new ArrayList<>();
         AgentExecutor.State lastState = null;
 
-        var generator = compiledGraph.stream(Map.of("messages", UserMessage.from(task)), config);
+        var generator = compiledGraph.stream(Map.of("messages", input), config);
         try {
             for (var item : generator) {
                 String nodeName = item.node();
@@ -77,6 +98,8 @@ public class StatefulPipelineService {
             }
         }
 
+        latestThreadBySession.put(sessionId, threadId);
+
         String answer = ReactAgentService.answerOf(lastState);
 
         // Fall back to the persisted checkpoint state when the stream produced nothing usable.
@@ -89,7 +112,18 @@ public class StatefulPipelineService {
 
         List<StateEntry> history = getStateHistory(threadId);
 
-        return new StatefulResult(threadId, task, answer, steps, history.size(), history);
+        return new StatefulResult(sessionId, task, answer, steps, history.size(), history);
+    }
+
+    private List<ChatMessage> priorMessages(String sessionId) {
+        String previousThread = latestThreadBySession.get(sessionId);
+        if (previousThread == null) {
+            return List.of();
+        }
+        return compiledGraph.lastStateOf(
+                        RunnableConfig.builder().threadId(previousThread).build())
+                .map(snapshot -> snapshot.state().messages())
+                .orElse(List.of());
     }
 
     public List<StateEntry> getStateHistory(String sessionId) {
