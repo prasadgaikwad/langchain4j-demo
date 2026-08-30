@@ -30,6 +30,7 @@ import dev.prasadgaikwad.langchain4jdemo.ai.DynamicAgent;
 import dev.prasadgaikwad.langchain4jdemo.ai.QaAssistant;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import dev.prasadgaikwad.langchain4jdemo.llm.ModelRegistry;
+import dev.prasadgaikwad.langchain4jdemo.llm.ModelScopedServices;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
 import dev.prasadgaikwad.langchain4jdemo.prompt.FewShotAssistant;
@@ -80,14 +81,24 @@ public class AiConfig {
 
     @Bean
     public Assistant assistant(ChatModel chatModel,
-                               ChatMemoryRegistry chatMemoryRegistry,
-                               @Value("${app.chat.model-name:gpt-4o-mini}") String modelName,
-                               @Value("${app.memory.max-messages:10}") int maxMessages,
-                               @Value("${app.memory.max-tokens:2000}") int maxTokens) {
+                               ChatMemoryProvider chatMemoryProvider) {
         return AiServices.builder(Assistant.class)
                 .chatModel(chatModel)
-                .chatMemoryProvider(createChatMemoryProvider(chatMemoryRegistry, modelName, maxMessages, maxTokens))
+                .chatMemoryProvider(chatMemoryProvider)
                 .build();
+    }
+
+    /**
+     * Shared conversation memory, reused by every chat service and by
+     * {@link ModelScopedServices} so per-model comparison instances share the
+     * same per-conversation memory semantics.
+     */
+    @Bean
+    public ChatMemoryProvider chatMemoryProvider(ChatMemoryRegistry chatMemoryRegistry,
+                                                 @Value("${app.chat.model-name:gpt-4o-mini}") String modelName,
+                                                 @Value("${app.memory.max-messages:10}") int maxMessages,
+                                                 @Value("${app.memory.max-tokens:2000}") int maxTokens) {
+        return createChatMemoryProvider(chatMemoryRegistry, modelName, maxMessages, maxTokens);
     }
 
     /**
@@ -112,19 +123,26 @@ public class AiConfig {
     }
 
     /**
+     * Factory for building per-model AI-service instances without repointing the
+     * shared {@link ModelRegistry}, used by model comparison (issue #267).
+     */
+    @Bean
+    public ModelScopedServices modelScopedServices(ChatMemoryProvider chatMemoryProvider,
+                                                   RetrievalAugmentor retrievalAugmentor) {
+        return new ModelScopedServices(chatMemoryProvider, retrievalAugmentor);
+    }
+
+    /**
      * Question-answering AI service: chats with memory and answers from the
      * documents retrieved by the {@link RetrievalAugmentor}.
      */
     @Bean
     public QaAssistant qaAssistant(ChatModel chatModel,
                                    RetrievalAugmentor retrievalAugmentor,
-                                   ChatMemoryRegistry chatMemoryRegistry,
-                                   @Value("${app.chat.model-name:gpt-4o-mini}") String modelName,
-                                   @Value("${app.memory.max-messages:10}") int maxMessages,
-                                   @Value("${app.memory.max-tokens:2000}") int maxTokens) {
+                                   ChatMemoryProvider chatMemoryProvider) {
         return AiServices.builder(QaAssistant.class)
                 .chatModel(chatModel)
-                .chatMemoryProvider(createChatMemoryProvider(chatMemoryRegistry, modelName, maxMessages, maxTokens))
+                .chatMemoryProvider(chatMemoryProvider)
                 .retrievalAugmentor(retrievalAugmentor)
                 .build();
     }

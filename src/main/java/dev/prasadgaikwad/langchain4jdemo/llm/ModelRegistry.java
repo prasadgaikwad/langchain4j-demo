@@ -128,6 +128,24 @@ public class ModelRegistry implements ChatModel {
     }
 
     /**
+     * Resolves a {@code provider:model} (or bare {@code provider}) spec to a
+     * chat model without changing the current selection (issue #267). Used to
+     * run a comparison against isolated model instances while live traffic
+     * keeps using the shared {@link #currentChatModel()}. A bare
+     * {@code provider} uses that provider's configured default model.
+     */
+    public ChatModel chatModelFor(String spec) {
+        String trimmed = spec.trim();
+        String[] parts = trimmed.split(":", 2);
+        LlmProvider provider = LlmProvider.fromLabel(parts[0]);
+        String modelName = parts.length > 1 && !parts[1].isBlank()
+                ? parts[1].trim()
+                : configuredModelNames.get(provider);
+        return models.computeIfAbsent(key(provider, modelName),
+                ignored -> buildChatModel(provider, modelName));
+    }
+
+    /**
      * The {@code provider:model} pairs available for comparison: every provider
      * whose API key is set in the environment, plus Ollama. Returns the
      * provider's configured default model.

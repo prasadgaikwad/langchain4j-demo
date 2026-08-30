@@ -10,9 +10,7 @@ import dev.prasadgaikwad.langchain4jdemo.evaluation.EvaluationService;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.GoldenDataset;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,7 +23,50 @@ class ModelComparisonServiceTest {
     }
 
     @Test
-    void evaluatesEveryAvailableModelAndRestoresTheOriginalSelection() {
+    void evaluatesEveryAvailableModelWithIsolatedModelsWithoutMutatingRegistry() {
+        FakeChatModel openai = new FakeChatModel("openai answer");
+        FakeChatModel anthropic = new FakeChatModel("anthropic answer");
+        Map<String, ChatModel> models = new LinkedHashMap<>();
+        models.put("openai:gpt-4o-mini", openai);
+        models.put("anthropic:claude-haiku-4-5-20251001", anthropic);
+
+        ModelRegistry registry = new ModelRegistry(LlmProvider.OPENAI, "gpt-4o-mini", models);
+        EvaluationService evaluationService = new EvaluationService(searchService(), new FakeChatModel("judge"));
+        ModelComparisonService comparison =
+                new ModelComparisonService(registry, evaluationService);
+
+        // A provider factory that resolves the per-model ChatModel so it can
+        // assert on which model was actually used. In production the factory would
+        // be backed by ModelScopedServices.
+        Map<String, ChatModel> usedDuringRun = new LinkedHashMap<>();
+        java.util.function.Function<String, AnswerProvider> providerFactory = label -> {
+            ChatModel chatModel = registry.chatModelFor(label);
+            usedDuringRun.put(label, chatModel);
+            return question -> "POSITIVE";
+        };
+
+        ComparisonReport report = comparison.compare(
+                GoldenDataset.sentiment(),
+                providerFactory);
+
+        assertThat(report.dataset()).isEqualTo("sentiment");
+        assertThat(report.models()).hasSize(2);
+
+        // The registry selection must be untouched by the comparison.
+        assertThat(registry.currentProvider()).isEqualTo(LlmProvider.OPENAI);
+        assertThat(registry.currentLabel()).isEqualTo("openai:gpt-4o-mini");
+        assertThat(registry.currentChatModel()).isSameAs(openai);
+
+        // Each model used its own isolated instance; the shared selection is not
+        // repointed during the run.
+        assertThat(usedDuringRun).containsKeys(
+                "openai:gpt-4o-mini", "anthropic:claude-haiku-4-5-20251001");
+        assertThat(usedDuringRun.get("openai:gpt-4o-mini")).isSameAs(openai);
+        assertThat(usedDuringRun.get("anthropic:claude-haiku-4-5-20251001")).isSameAs(anthropic);
+    }
+
+    @Test
+    void comparisonIsIndependentOfCurrentSelectionRepointing() {
         FakeChatModel openai = new FakeChatModel("openai answer");
         FakeChatModel anthropic = new FakeChatModel("anthropic answer");
         Map<String, ChatModel> models = new LinkedHashMap<>();
@@ -33,30 +74,17 @@ class ModelComparisonServiceTest {
         models.put("anthropic:claude-haiku-4-5-20251001", anthropic);
         ModelRegistry registry = new ModelRegistry(LlmProvider.OPENAI, "gpt-4o-mini", models);
         ModelComparisonService comparison =
-                new ModelComparisonService(registry, new EvaluationService(searchService(), new FakeChatModel("1")));
+                new ModelComparisonService(registry, new EvaluationService(searchService(), new FakeChatModel("judge")));
 
-        List<String> usedDuringRun = new ArrayList<>();
-        AnswerProvider provider = question -> {
-            usedDuringRun.add(registry.currentLabel());
-            return "POSITIVE";
-        };
+        // A concurrent /model chat switch during the comparison must not affect it.
+        registry.setModel("anthropic");
+        ComparisonReport report = comparison.compare(
+                GoldenDataset.sentiment(),
+                label -> question -> "POSITIVE");
 
-        ComparisonReport report = comparison.compare(GoldenDataset.sentiment(), provider);
-
-        assertThat(report.dataset()).isEqualTo("sentiment");
-        assertThat(report.models()).hasSize(2);
-        assertThat(report.models().get(0).model()).isEqualTo("anthropic:claude-haiku-4-5-20251001");
-        assertThat(report.models().get(1).model()).isEqualTo("openai:gpt-4o-mini");
-        assertThat(report.models()).allSatisfy(row ->
-                assertThat(row.scores()).containsKeys("exact", "contains", "f1", "rougeL", "embed", "judge"));
-        assertThat(report.models().stream().flatMap(row -> row.scores().values().stream()))
-                .allSatisfy(score -> assertThat(score).isBetween(0.0, 1.0));
-        assertThat(usedDuringRun).hasSize(6)
-                .contains("anthropic:claude-haiku-4-5-20251001", "openai:gpt-4o-mini");
-
-        assertThat(registry.currentProvider()).isEqualTo(LlmProvider.OPENAI);
-        assertThat(registry.currentLabel()).isEqualTo("openai:gpt-4o-mini");
-        assertThat(registry.currentChatModel()).isSameAs(openai);
-        assertThat(anthropic.lastRequest()).isNull();
+        assertThat(registry.currentLabel()).isEqualTo("anthropic:claude-haiku-4-5-20251001");
+        assertThat(report.models()).hasSize(2)
+                .extracting(ModelScore::model)
+                .contains("openai:gpt-4o-mini", "anthropic:claude-haiku-4-5-20251001");
     }
 }

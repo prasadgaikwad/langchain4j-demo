@@ -27,6 +27,7 @@ import dev.prasadgaikwad.langchain4jdemo.evaluation.GoldenDataset;
 import dev.prasadgaikwad.langchain4jdemo.llm.ComparisonReport;
 import dev.prasadgaikwad.langchain4jdemo.llm.ModelComparisonService;
 import dev.prasadgaikwad.langchain4jdemo.llm.ModelRegistry;
+import dev.prasadgaikwad.langchain4jdemo.llm.ModelScopedServices;
 import dev.prasadgaikwad.langchain4jdemo.llm.ModelScore;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
@@ -51,6 +52,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Scanner;
+import java.util.function.Function;
 
 /**
  * Interactive command-line interface combining conversation chat, semantic
@@ -88,6 +90,7 @@ public class ChatCli implements CommandLineRunner {
     private final DynamicAgent dynamicAgent;
     private final JsonSchemaExtractionService jsonSchemaExtractionService;
     private final ModelRegistry modelRegistry;
+    private final ModelScopedServices modelScopedServices;
     private final ModelComparisonService modelComparisonService;
     private final CrewService crewService;
     private final StreamingAgent streamingAgent;
@@ -117,6 +120,7 @@ public class ChatCli implements CommandLineRunner {
                    DynamicAgent dynamicAgent,
                    JsonSchemaExtractionService jsonSchemaExtractionService,
                    ModelRegistry modelRegistry,
+                   ModelScopedServices modelScopedServices,
                    ModelComparisonService modelComparisonService,
                    CrewService crewService,
                    StreamingAgent streamingAgent,
@@ -144,6 +148,7 @@ public class ChatCli implements CommandLineRunner {
         this.dynamicAgent = dynamicAgent;
         this.jsonSchemaExtractionService = jsonSchemaExtractionService;
         this.modelRegistry = modelRegistry;
+        this.modelScopedServices = modelScopedServices;
         this.modelComparisonService = modelComparisonService;
         this.crewService = crewService;
         this.streamingAgent = streamingAgent;
@@ -773,7 +778,7 @@ public class ChatCli implements CommandLineRunner {
                 : (compare ? "rag" : mode);
 
         GoldenDataset dataset;
-        AnswerProvider provider;
+        Function<String, AnswerProvider> providerFactory;
         switch (datasetMode) {
             case "rag" -> {
                 if (searchService.storeSize() == 0) {
@@ -781,15 +786,15 @@ public class ChatCli implements CommandLineRunner {
                     return;
                 }
                 dataset = GoldenDataset.rag();
-                provider = question -> qaService.ask(memoryId, question);
+                providerFactory = model -> question -> modelScopedServices.qaAssistant(modelRegistry.chatModelFor(model)).ask(memoryId, question);
             }
             case "chat" -> {
                 dataset = GoldenDataset.chat();
-                provider = question -> assistant.chat(memoryId, question);
+                providerFactory = model -> question -> modelScopedServices.assistant(modelRegistry.chatModelFor(model)).chat(memoryId, question);
             }
             case "sentiment" -> {
                 dataset = GoldenDataset.sentiment();
-                provider = question -> fewShotAssistant.classify(question).name();
+                providerFactory = model -> question -> modelScopedServices.fewShotAssistant(modelRegistry.chatModelFor(model)).classify(question).name();
             }
             default -> {
                 System.out.println("Unknown evaluation: " + datasetMode
@@ -801,14 +806,15 @@ public class ChatCli implements CommandLineRunner {
         System.out.println("Evaluating " + dataset.goldenQuestions().size() + " sample(s) on the '" + dataset.name()
                 + "' dataset...");
         if (compare) {
-            runModelComparison(dataset, provider);
+            runModelComparison(dataset, providerFactory);
         } else {
-            EvaluationReport report = evaluationService.evaluate(dataset, provider);
+            EvaluationReport report = evaluationService.evaluate(dataset,
+                    providerFactory.apply(modelRegistry.currentLabel()));
             printEvaluationReport(report);
         }
     }
 
-    private void runModelComparison(GoldenDataset dataset, AnswerProvider provider) {
+    private void runModelComparison(GoldenDataset dataset, Function<String, AnswerProvider> providerFactory) {
         List<String> models = modelRegistry.availableModels();
         if (models.isEmpty()) {
             System.out.println("No models available for comparison. Set an OPENAI_API_KEY, ANTHROPIC_API_KEY, "
@@ -816,7 +822,7 @@ public class ChatCli implements CommandLineRunner {
             return;
         }
         System.out.println("Comparing " + models.size() + " model(s): " + String.join(", ", models) + "...");
-        ComparisonReport report = modelComparisonService.compare(dataset, provider);
+        ComparisonReport report = modelComparisonService.compare(dataset, providerFactory);
         printComparisonReport(report);
     }
 
