@@ -15,16 +15,17 @@ import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.agentexecutor.AgentExecutor;
-import org.bsc.langgraph4j.checkpoint.MemorySaver;
+import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.state.StateSnapshot;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * ReACT agent with conversational sessions over langgraph4j checkpoints.
@@ -42,16 +43,20 @@ public class StatefulPipelineService {
 
     private static final int MAX_ITERATIONS = 8;
 
+    /** Upper bound on the number of sessions tracked for continuity seeding. */
+    private static final int MAX_TRACKED_SESSIONS = 1000;
+
     private final CompiledGraph<AgentExecutor.State> compiledGraph;
 
     /** Session id -> thread id of that session's most recent run. */
-    private final Map<String, String> latestThreadBySession = new ConcurrentHashMap<>();
+    private final Map<String, String> latestThreadBySession;
 
     public StatefulPipelineService(ChatModel chatModel,
                                    CalculatorTool calculatorTool,
                                    DocumentSearchTool documentSearchTool,
                                    WeatherTool weatherTool,
-                                   EmbeddingStoreStatsTool storeStatsTool) throws GraphStateException {
+                                   EmbeddingStoreStatsTool storeStatsTool,
+                                   BaseCheckpointSaver checkpointSaver) throws GraphStateException {
         StateGraph<AgentExecutor.State> graph = AgentExecutor.builder()
                 .chatModel(chatModel)
                 .systemMessage(SystemMessage.from(ReactAgentService.SYSTEM_MESSAGE))
@@ -60,9 +65,23 @@ public class StatefulPipelineService {
 
         this.compiledGraph = graph.compile(
                 CompileConfig.builder()
-                        .checkpointSaver(new MemorySaver())
+                        .checkpointSaver(checkpointSaver)
                         .recursionLimit(MAX_ITERATIONS * 2)
                         .build());
+
+        this.latestThreadBySession = createBoundedSessionMap();
+    }
+
+    private static Map<String, String> createBoundedSessionMap() {
+        // Bounded so a long-running server cannot grow the continuity map without
+        // bound (issue #252). Evicts the oldest-inserted session first. Access is
+        // low-frequency, so a synchronized insertion-ordered map is sufficient.
+        return Collections.synchronizedMap(new LinkedHashMap<>() {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                return size() > MAX_TRACKED_SESSIONS;
+            }
+        });
     }
 
     public StatefulResult run(String sessionId, String task) {

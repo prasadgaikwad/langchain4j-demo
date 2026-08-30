@@ -16,7 +16,7 @@ import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.agent.Agent;
 import org.bsc.langgraph4j.agentexecutor.AgentExecutor;
-import org.bsc.langgraph4j.checkpoint.MemorySaver;
+import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.state.StateSnapshot;
 import org.springframework.stereotype.Service;
 
@@ -50,7 +50,8 @@ public class HumanInTheLoopService {
                                  CalculatorTool calculatorTool,
                                  DocumentSearchTool documentSearchTool,
                                  WeatherTool weatherTool,
-                                 EmbeddingStoreStatsTool storeStatsTool) throws GraphStateException {
+                                 EmbeddingStoreStatsTool storeStatsTool,
+                                 BaseCheckpointSaver checkpointSaver) throws GraphStateException {
         StateGraph<AgentExecutor.State> graph = AgentExecutor.builder()
                 .chatModel(chatModel)
                 .systemMessage(SystemMessage.from(ReactAgentService.SYSTEM_MESSAGE))
@@ -59,7 +60,7 @@ public class HumanInTheLoopService {
 
         this.compiledGraph = graph.compile(
                 CompileConfig.builder()
-                        .checkpointSaver(new MemorySaver())
+                        .checkpointSaver(checkpointSaver)
                         .interruptBefore(Agent.ACTION_LABEL)
                         .recursionLimit(MAX_ITERATIONS * 2)
                         .build());
