@@ -31,10 +31,21 @@ public class EvaluationService {
     }
 
     /**
-     * Evaluates the dataset with the {@link #defaultMetrics()}.
+     * Evaluates the dataset against the provided answers using the shared
+     * judge model and the {@link #defaultMetrics()}.
      */
     public EvaluationReport evaluate(GoldenDataset dataset, AnswerProvider provider) {
         return evaluate(dataset, provider, defaultMetrics());
+    }
+
+    /**
+     * Evaluates the dataset against the provided answers using a
+     * model-specific judge (issue #267). Lets a model comparison score each
+     * candidate model's outputs with that same model acting as judge, without
+     * touching the shared judge.
+     */
+    public EvaluationReport evaluate(GoldenDataset dataset, AnswerProvider provider, ChatModel judge) {
+        return evaluate(dataset, provider, defaultMetrics(judge));
     }
 
     public EvaluationReport evaluate(GoldenDataset dataset, AnswerProvider provider, List<Metric> metrics) {
@@ -55,6 +66,10 @@ public class EvaluationService {
      * the LLM-as-a-judge score.
      */
     public List<Metric> defaultMetrics() {
+        return defaultMetrics(judge);
+    }
+
+    private List<Metric> defaultMetrics(ChatModel judge) {
         return List.of(
                 Metrics.exactMatch(),
                 Metrics.contains(),

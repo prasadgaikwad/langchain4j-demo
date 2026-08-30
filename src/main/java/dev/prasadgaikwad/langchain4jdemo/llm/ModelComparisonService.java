@@ -8,15 +8,18 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Runs a golden dataset against every available model (see
  * {@link ModelRegistry#availableModels()}) and collects the averaged scores into
- * a {@link ComparisonReport}. Because the {@link ModelRegistry} is the single
- * chat-model bean, switching the selection switches the entire pipeline (and
- * the LLM-as-a-judge metric) for each model in the comparison.
+ * a {@link ComparisonReport}.
  * <p>
- * The user's current model selection is restored after the comparison.
+ * Each candidate model is evaluated with an <b>isolated</b> instance built via
+ * {@link ModelRegistry#chatModelFor(String)} plus a model-scoped
+ * {@link AnswerProvider} and judge produced by the {@code providerFactory}.
+ * The shared {@link ModelRegistry} selection is never mutated, so live traffic
+ * is unaffected by a running comparison (issue #267).
  */
 @Service
 public class ModelComparisonService {
@@ -29,19 +32,19 @@ public class ModelComparisonService {
         this.evaluationService = evaluationService;
     }
 
-    public ComparisonReport compare(GoldenDataset dataset, AnswerProvider provider) {
-        LlmProvider originalProvider = modelRegistry.currentProvider();
-        String originalModelName = modelRegistry.currentModelName();
-        try {
-            List<ModelScore> rows = new ArrayList<>();
-            for (String model : modelRegistry.availableModels()) {
-                modelRegistry.setModel(model);
-                EvaluationReport report = evaluationService.evaluate(dataset, provider);
-                rows.add(new ModelScore(model, report.averageScores()));
-            }
-            return new ComparisonReport(dataset.name(), rows);
-        } finally {
-            modelRegistry.setModel(originalProvider, originalModelName);
+    /**
+     * @param providerFactory maps a {@code provider:model} label to an
+     *                        {@link AnswerProvider} built against an isolated
+     *                        model for that label
+     */
+    public ComparisonReport compare(GoldenDataset dataset, Function<String, AnswerProvider> providerFactory) {
+        List<ModelScore> rows = new ArrayList<>();
+        for (String model : modelRegistry.availableModels()) {
+            var chatModel = modelRegistry.chatModelFor(model);
+            EvaluationReport report =
+                    evaluationService.evaluate(dataset, providerFactory.apply(model), chatModel);
+            rows.add(new ModelScore(model, report.averageScores()));
         }
+        return new ComparisonReport(dataset.name(), rows);
     }
 }
