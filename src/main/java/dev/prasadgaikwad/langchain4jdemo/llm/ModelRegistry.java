@@ -40,8 +40,17 @@ public class ModelRegistry implements ChatModel {
     private final Map<LlmProvider, String> configuredModelNames = new LinkedHashMap<>();
     private final String ollamaBaseUrl;
     private final List<String> testAvailableModels;
-    private LlmProvider currentProvider;
-    private String currentModelName;
+
+    /**
+     * Immutable snapshot of the current selection. Read as a single value so a
+     * request never observes a torn {@code provider/model} pair while another
+     * thread calls {@link #setModel} (issue #253). Marked volatile for safe
+     * publication.
+     */
+    private volatile Selection selection;
+
+    /** Immutable {@code (provider, modelName)} pair. */
+    private record Selection(LlmProvider provider, String modelName) {}
 
     @Autowired
     public ModelRegistry(@Value("${app.chat.provider:openai}") String currentProviderLabel,
@@ -50,8 +59,7 @@ public class ModelRegistry implements ChatModel {
                          @Value("${app.models.gemini-model:gemini-2.5-flash}") String geminiModel,
                          @Value("${app.models.ollama-model:llama3.2}") String ollamaModel,
                          @Value("${app.ollama.base-url:http://localhost:11434}") String ollamaBaseUrl) {
-        this.currentProvider = LlmProvider.fromLabel(currentProviderLabel);
-        this.currentModelName = currentModelName;
+        this.selection = new Selection(LlmProvider.fromLabel(currentProviderLabel), currentModelName);
         this.ollamaBaseUrl = ollamaBaseUrl;
         this.testAvailableModels = null;
         configuredModelNames.put(LlmProvider.OPENAI, currentModelName);
@@ -66,8 +74,7 @@ public class ModelRegistry implements ChatModel {
      * those models so tests are independent of environment API keys.
      */
     ModelRegistry(LlmProvider currentProvider, String currentModelName, Map<String, ChatModel> models) {
-        this.currentProvider = currentProvider;
-        this.currentModelName = currentModelName;
+        this.selection = new Selection(currentProvider, currentModelName);
         this.ollamaBaseUrl = "http://localhost:11434";
         this.testAvailableModels = models.keySet().stream().sorted().toList();
         this.models.putAll(models);
@@ -77,26 +84,29 @@ public class ModelRegistry implements ChatModel {
     }
 
     /**
-     * The model used by the app right now, built lazily on first use.
+     * The model used by the app right now, built lazily on first use. Reads the
+     * selection snapshot once so the provider and model name are always paired
+     * consistently (issue #253).
      */
     public ChatModel currentChatModel() {
-        return models.computeIfAbsent(key(currentProvider, currentModelName),
-                ignored -> buildChatModel(currentProvider, currentModelName));
+        Selection s = selection;
+        return models.computeIfAbsent(key(s.provider, s.modelName),
+                ignored -> buildChatModel(s.provider, s.modelName));
     }
 
     public LlmProvider currentProvider() {
-        return currentProvider;
+        return selection.provider;
     }
 
     public String currentModelName() {
-        return currentModelName;
+        return selection.modelName;
     }
 
     /**
      * Human-readable label of the current selection, e.g. {@code openai:gpt-4o-mini}.
      */
     public String currentLabel() {
-        return key(currentProvider, currentModelName);
+        return key(selection.provider, selection.modelName);
     }
 
     /**
@@ -114,8 +124,7 @@ public class ModelRegistry implements ChatModel {
     }
 
     public void setModel(LlmProvider provider, String modelName) {
-        this.currentProvider = provider;
-        this.currentModelName = modelName;
+        this.selection = new Selection(provider, modelName);
     }
 
     /**
