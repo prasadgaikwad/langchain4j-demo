@@ -61,7 +61,8 @@ class StatefulPipelineServiceTest {
                 new CalculatorTool(),
                 new DocumentSearchTool(null),
                 new WeatherTool(),
-                new EmbeddingStoreStatsTool(null));
+                new EmbeddingStoreStatsTool(null),
+                new BoundedMemorySaver(10_000));
     }
 
     @Test

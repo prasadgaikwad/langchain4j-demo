@@ -33,6 +33,7 @@ import dev.prasadgaikwad.langchain4jdemo.llm.ModelRegistry;
 import dev.prasadgaikwad.langchain4jdemo.llm.ModelScopedServices;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
 import dev.prasadgaikwad.langchain4jdemo.memory.MemoryType;
+import dev.prasadgaikwad.langchain4jdemo.orchestration.BoundedMemorySaver;
 import dev.prasadgaikwad.langchain4jdemo.prompt.FewShotAssistant;
 import dev.prasadgaikwad.langchain4jdemo.prompt.MovieExtractor;
 import dev.prasadgaikwad.langchain4jdemo.prompt.TopicExtractor;
@@ -130,6 +131,17 @@ public class AiConfig {
     public ModelScopedServices modelScopedServices(ChatMemoryProvider chatMemoryProvider,
                                                    RetrievalAugmentor retrievalAugmentor) {
         return new ModelScopedServices(chatMemoryProvider, retrievalAugmentor);
+    }
+
+    /**
+     * Bounded checkpoint store shared by the stateful and human-in-the-loop
+     * graphs so long-running sessions cannot leak checkpoint memory without
+     * bound (issue #252).
+     */
+    @Bean
+    public BoundedMemorySaver checkpointSaver(
+            @Value("${app.checkpoint.max-checkpoints:10000}") int maxCheckpoints) {
+        return new BoundedMemorySaver(maxCheckpoints);
     }
 
     /**
