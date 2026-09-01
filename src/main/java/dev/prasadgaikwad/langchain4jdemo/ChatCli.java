@@ -772,8 +772,10 @@ public class ChatCli implements CommandLineRunner {
         String mode = argument != null && !argument.isBlank() ? argument.trim().toLowerCase(Locale.ROOT) : "rag";
         String memoryId = currentMemoryType.memoryId(CONVERSATION_ID);
 
-        boolean compare = mode.equals("compare");
-        String datasetMode = compare && argument != null && !argument.trim().equalsIgnoreCase("compare")
+        String firstToken = argument != null && !argument.isBlank()
+                ? argument.trim().split("\\s+", 2)[0].toLowerCase(Locale.ROOT) : "";
+        boolean compare = firstToken.equals("compare");
+        String datasetMode = compare && argument.trim().split("\\s+", 2).length > 1
                 ? argument.trim().split("\\s+", 2)[1].toLowerCase(Locale.ROOT)
                 : (compare ? "rag" : mode);
 
