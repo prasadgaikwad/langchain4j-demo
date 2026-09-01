@@ -2,18 +2,10 @@ package dev.prasadgaikwad.langchain4jdemo.orchestration;
 
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatModel;
-import dev.prasadgaikwad.langchain4jdemo.agent.CalculatorTool;
-import dev.prasadgaikwad.langchain4jdemo.agent.DocumentSearchTool;
-import dev.prasadgaikwad.langchain4jdemo.agent.EmbeddingStoreStatsTool;
-import dev.prasadgaikwad.langchain4jdemo.agent.WeatherTool;
-import org.bsc.langgraph4j.CompileConfig;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.RunnableConfig;
-import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.agentexecutor.AgentExecutor;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.state.StateSnapshot;
@@ -37,11 +29,13 @@ import java.util.UUID;
  * turn's text (issue #249). Conversation continuity is preserved instead by
  * seeding each new run's {@code messages} channel with the previous run's
  * transcript plus the new user message.</p>
+ *
+ * <p>The graph and stream/answer helpers are provided by {@link
+ * AgentGraphFactory} (issue T1); checkpoint memory is bounded via the shared
+ * {@link BoundedMemorySaver} (issue #252).</p>
  */
 @Service
 public class StatefulPipelineService {
-
-    private static final int MAX_ITERATIONS = 8;
 
     /** Upper bound on the number of sessions tracked for continuity seeding. */
     private static final int MAX_TRACKED_SESSIONS = 1000;
@@ -51,24 +45,9 @@ public class StatefulPipelineService {
     /** Session id -> thread id of that session's most recent run. */
     private final Map<String, String> latestThreadBySession;
 
-    public StatefulPipelineService(ChatModel chatModel,
-                                   CalculatorTool calculatorTool,
-                                   DocumentSearchTool documentSearchTool,
-                                   WeatherTool weatherTool,
-                                   EmbeddingStoreStatsTool storeStatsTool,
-                                   BaseCheckpointSaver checkpointSaver) throws GraphStateException {
-        StateGraph<AgentExecutor.State> graph = AgentExecutor.builder()
-                .chatModel(chatModel)
-                .systemMessage(SystemMessage.from(ReactAgentService.SYSTEM_MESSAGE))
-                .toolsFromObject(calculatorTool, documentSearchTool, weatherTool, storeStatsTool)
-                .build();
-
-        this.compiledGraph = graph.compile(
-                CompileConfig.builder()
-                        .checkpointSaver(checkpointSaver)
-                        .recursionLimit(MAX_ITERATIONS * 2)
-                        .build());
-
+    public StatefulPipelineService(AgentGraphFactory factory, BaseCheckpointSaver checkpointSaver)
+            throws GraphStateException {
+        this.compiledGraph = factory.checkpointed(checkpointSaver);
         this.latestThreadBySession = createBoundedSessionMap();
     }
 
@@ -99,39 +78,25 @@ public class StatefulPipelineService {
                 .threadId(threadId)
                 .build();
 
-        List<String> steps = new ArrayList<>();
-        AgentExecutor.State lastState = null;
-
-        var generator = compiledGraph.stream(Map.of("messages", input), config);
-        try {
-            for (var item : generator) {
-                String nodeName = item.node();
-                if (!"__START__".equals(nodeName) && !"__END__".equals(nodeName)) {
-                    steps.add(nodeName);
-                }
-                lastState = item.state();
-            }
-        } catch (RuntimeException e) {
-            if (lastState == null && steps.isEmpty()) {
-                throw e;
-            }
-        }
+        AgentGraphFactory.GraphRun<AgentExecutor.State> run =
+                AgentGraphFactory.stream(compiledGraph, Map.of("messages", input), config);
 
         latestThreadBySession.put(sessionId, threadId);
 
-        String answer = ReactAgentService.answerOf(lastState);
+        AgentExecutor.State lastState = run.lastState();
+        String answer = AgentGraphFactory.answerOf(lastState);
 
         // Fall back to the persisted checkpoint state when the stream produced nothing usable.
         if (answer.equals("No response")) {
             lastState = compiledGraph.lastStateOf(config)
                     .map(StateSnapshot::state)
                     .orElse(null);
-            answer = ReactAgentService.answerOf(lastState);
+            answer = AgentGraphFactory.answerOf(lastState);
         }
 
         List<StateEntry> history = getStateHistory(threadId);
 
-        return new StatefulResult(sessionId, task, answer, steps, history.size(), history);
+        return new StatefulResult(sessionId, task, answer, run.steps(), history.size(), history);
     }
 
     private List<ChatMessage> priorMessages(String sessionId) {

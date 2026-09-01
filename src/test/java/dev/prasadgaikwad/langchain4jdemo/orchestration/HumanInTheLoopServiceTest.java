@@ -94,11 +94,12 @@ class HumanInTheLoopServiceTest {
     }
 
     private HumanInTheLoopService newService(ChatModel model) throws Exception {
-        return new HumanInTheLoopService(model,
-                new CalculatorTool(),
-                new DocumentSearchTool(null),
-                new WeatherTool(),
-                new EmbeddingStoreStatsTool(null),
+        return new HumanInTheLoopService(
+                new AgentGraphFactory(model,
+                        new CalculatorTool(),
+                        new DocumentSearchTool(null),
+                        new WeatherTool(),
+                        new EmbeddingStoreStatsTool(null)),
                 new BoundedMemorySaver(10_000));
     }
 

@@ -57,11 +57,12 @@ class StatefulPipelineServiceTest {
     }
 
     private StatefulPipelineService newService(GreetingThenToolModel model) throws Exception {
-        return new StatefulPipelineService(model,
-                new CalculatorTool(),
-                new DocumentSearchTool(null),
-                new WeatherTool(),
-                new EmbeddingStoreStatsTool(null),
+        return new StatefulPipelineService(
+                new AgentGraphFactory(model,
+                        new CalculatorTool(),
+                        new DocumentSearchTool(null),
+                        new WeatherTool(),
+                        new EmbeddingStoreStatsTool(null)),
                 new BoundedMemorySaver(10_000));
     }
 
