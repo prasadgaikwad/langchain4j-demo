@@ -76,12 +76,16 @@ public class WorkflowOfAgentsService {
         result.agenticScope().agentInvocations().forEach(
                 inv -> executedAgents.add(inv.agentName()));
 
+        int refinementIterations = (int) result.agenticScope().agentInvocations().stream()
+                .filter(inv -> QualityScorerAgent.class.equals(inv.agentType()))
+                .count();
+
         return new WorkflowPipelineResult(
                 topic,
                 (String) scope.get("research"),
                 (String) scope.get("draft"),
                 (String) scope.get("formatted"),
-                ((Number) scope.getOrDefault("iterationCount", 0)).intValue(),
+                refinementIterations,
                 (String) scope.get("category"),
                 executedAgents);
     }
