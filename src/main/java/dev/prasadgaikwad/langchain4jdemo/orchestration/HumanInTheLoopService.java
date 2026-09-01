@@ -2,18 +2,10 @@ package dev.prasadgaikwad.langchain4jdemo.orchestration;
 
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatModel;
-import dev.prasadgaikwad.langchain4jdemo.agent.CalculatorTool;
-import dev.prasadgaikwad.langchain4jdemo.agent.DocumentSearchTool;
-import dev.prasadgaikwad.langchain4jdemo.agent.EmbeddingStoreStatsTool;
-import dev.prasadgaikwad.langchain4jdemo.agent.WeatherTool;
-import org.bsc.langgraph4j.CompileConfig;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.RunnableConfig;
-import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.agent.Agent;
 import org.bsc.langgraph4j.agentexecutor.AgentExecutor;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
@@ -38,32 +30,19 @@ import java.util.UUID;
  * {@code stream(null, config)} which continues at the checkpoint's next node
  * instead of starting a new run; rejections never touch the graph, so
  * unapproved tools can never execute.</p>
+ *
+ * <p>The graph and stream/answer helpers are provided by {@link
+ * AgentGraphFactory} (issue T1); checkpoint memory is bounded via the shared
+ * {@link BoundedMemorySaver} (issue #252).</p>
  */
 @Service
 public class HumanInTheLoopService {
 
-    private static final int MAX_ITERATIONS = 8;
-
     private final CompiledGraph<AgentExecutor.State> compiledGraph;
 
-    public HumanInTheLoopService(ChatModel chatModel,
-                                 CalculatorTool calculatorTool,
-                                 DocumentSearchTool documentSearchTool,
-                                 WeatherTool weatherTool,
-                                 EmbeddingStoreStatsTool storeStatsTool,
-                                 BaseCheckpointSaver checkpointSaver) throws GraphStateException {
-        StateGraph<AgentExecutor.State> graph = AgentExecutor.builder()
-                .chatModel(chatModel)
-                .systemMessage(SystemMessage.from(ReactAgentService.SYSTEM_MESSAGE))
-                .toolsFromObject(calculatorTool, documentSearchTool, weatherTool, storeStatsTool)
-                .build();
-
-        this.compiledGraph = graph.compile(
-                CompileConfig.builder()
-                        .checkpointSaver(checkpointSaver)
-                        .interruptBefore(Agent.ACTION_LABEL)
-                        .recursionLimit(MAX_ITERATIONS * 2)
-                        .build());
+    public HumanInTheLoopService(AgentGraphFactory factory, BaseCheckpointSaver checkpointSaver)
+            throws GraphStateException {
+        this.compiledGraph = factory.humanInTheLoop(checkpointSaver);
     }
 
     public HitlResult start(String sessionId, String task) {
@@ -87,7 +66,7 @@ public class HumanInTheLoopService {
             // Resuming would execute the unapproved tools (the agent->action
             // edge is unconditional), so rejection ends the session here.
             String answer = compiledGraph.lastStateOf(configFor(sessionId))
-                    .map(snapshot -> ReactAgentService.answerOf(snapshot.state()))
+                    .map(snapshot -> AgentGraphFactory.answerOf(snapshot.state()))
                     .orElse("No response");
             return new HitlResult(sessionId, "(rejected: " + feedback + ")", answer,
                     List.of(), false, "", feedback);
@@ -103,19 +82,9 @@ public class HumanInTheLoopService {
         RunnableConfig config = configFor(sessionId);
         // null input means GraphInput.resume(): continue at the checkpoint's
         // next node. An empty map would start a NEW run from the entrypoint.
-        var generator = compiledGraph.stream(input, config);
-        try {
-            for (var item : generator) {
-                String nodeName = item.node();
-                if (!"__START__".equals(nodeName) && !"__END__".equals(nodeName)) {
-                    steps.add(nodeName);
-                }
-            }
-        } catch (RuntimeException e) {
-            if (steps.isEmpty()) {
-                throw e;
-            }
-        }
+        AgentGraphFactory.GraphRun<AgentExecutor.State> run =
+                AgentGraphFactory.stream(compiledGraph, input, config);
+        steps.addAll(run.steps());
     }
 
     /**
@@ -176,7 +145,7 @@ public class HumanInTheLoopService {
         String answer = "";
         if (!awaitingApproval) {
             answer = compiledGraph.lastStateOf(configFor(sessionId))
-                    .map(snapshot -> ReactAgentService.answerOf(snapshot.state()))
+                    .map(snapshot -> AgentGraphFactory.answerOf(snapshot.state()))
                     .orElse("No response");
         }
 
