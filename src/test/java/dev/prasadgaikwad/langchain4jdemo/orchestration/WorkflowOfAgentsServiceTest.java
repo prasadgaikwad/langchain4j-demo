@@ -55,6 +55,7 @@ class WorkflowOfAgentsServiceTest {
         WorkflowPipelineResult result = service.run("Quick topic");
 
         assertThat(result.category()).isEqualTo(CATEGORY_TECHNICAL);
+        assertThat(result.refinementIterations()).isEqualTo(1);
         // 2 parallel + 1 draft + 1 score (exits immediately) + 1 category + 1 format = 6
         assertThat(chatModel.calls).isEqualTo(6);
     }
@@ -74,6 +75,7 @@ class WorkflowOfAgentsServiceTest {
         WorkflowPipelineResult result = service.run("Complex topic");
 
         assertThat(result.category()).isEqualTo(CATEGORY_TECHNICAL);
+        assertThat(result.refinementIterations()).isEqualTo(3);
     }
 
     @Test
@@ -103,7 +105,7 @@ class WorkflowOfAgentsServiceTest {
         }
 
         @Override
-        public ChatResponse doChat(ChatRequest chatRequest) {
+        public synchronized ChatResponse doChat(ChatRequest chatRequest) {
             requests.add(chatRequest);
             String response = responses.get(Math.min(calls, responses.size() - 1));
             calls++;
