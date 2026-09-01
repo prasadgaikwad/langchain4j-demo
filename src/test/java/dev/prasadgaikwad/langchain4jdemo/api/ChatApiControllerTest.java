@@ -186,6 +186,28 @@ class ChatApiControllerTest {
     }
 
     @Test
+    void streamRecordsHistoryOnError() throws Exception {
+        doAnswer(invocation -> {
+            ChatStreamingService.StreamConsumer consumer = invocation.getArgument(1);
+            consumer.onToken("Hello ");
+            consumer.onToken("world");
+            consumer.onError(new RuntimeException("stream failed"));
+            return null;
+        }).when(streamingService).stream(anyString(), any());
+
+        mockMvc.perform(get("/api/chat/stream")
+                        .param("message", "hi")
+                        .param("conversationId", "error-stream"))
+                .andReturn();
+
+        mockMvc.perform(get("/api/history/error-stream"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].text").value("hi"))
+                .andExpect(jsonPath("$[1].text").value("Hello world"));
+    }
+
+    @Test
     void chainReturnsFullPipelineTrace() throws Exception {
         when(chainOfAgentsService.runWithTrace("test topic")).thenReturn(
                 new ChainPipelineResult("test topic", "# Outline", "Draft text", "Edited text", "# Formatted post"));

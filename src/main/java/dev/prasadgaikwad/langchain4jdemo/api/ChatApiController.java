@@ -260,10 +260,12 @@ public class ChatApiController {
                     schema = @Schema(defaultValue = "api"))
             @RequestParam(defaultValue = "api") String conversationId) {
         SseEmitter emitter = new SseEmitter(60_000L);
+        java.util.List<String> tokens = new java.util.ArrayList<>();
         streamingService.stream(message, new ChatStreamingService.StreamConsumer() {
             @Override
             public void onToken(String token) {
                 send(emitter, token);
+                tokens.add(token);
             }
 
             @Override
@@ -274,6 +276,10 @@ public class ChatApiController {
 
             @Override
             public void onError(Throwable error) {
+                String partial = String.join("", tokens);
+                if (!partial.isEmpty()) {
+                    recordTurn(conversationId, message, partial);
+                }
                 emitter.completeWithError(error);
             }
         });
