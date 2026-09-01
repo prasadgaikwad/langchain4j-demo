@@ -1,11 +1,11 @@
 package dev.prasadgaikwad.langchain4jdemo.db;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
@@ -30,7 +30,7 @@ public class ConversationEntry {
     @Schema(description = "Message role", example = "user")
     private String role;
 
-    @Column(length = 4000)
+    @Lob
     @Schema(description = "The message text", example = "Hello! How do I use RAG?")
     private String text;
 

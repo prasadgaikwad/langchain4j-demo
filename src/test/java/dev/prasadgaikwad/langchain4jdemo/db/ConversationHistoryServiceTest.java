@@ -56,4 +56,16 @@ class ConversationHistoryServiceTest {
         assertThat(service.history("conv-a")).isEmpty();
         assertThat(service.history("conv-b")).hasSize(1);
     }
+
+    @Test
+    void storesTextLongerThan4000CharsWithoutLoss() {
+        ConversationHistoryService service = new ConversationHistoryService(repository);
+        String longAnswer = "x".repeat(6000);
+
+        service.record("conv-1", "ai", longAnswer);
+
+        List<ConversationEntry> history = service.history("conv-1");
+        assertThat(history).hasSize(1);
+        assertThat(history.get(0).getText()).isEqualTo(longAnswer);
+    }
 }
