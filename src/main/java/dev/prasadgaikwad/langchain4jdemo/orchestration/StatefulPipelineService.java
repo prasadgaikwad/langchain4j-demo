@@ -9,6 +9,8 @@ import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.agentexecutor.AgentExecutor;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.state.StateSnapshot;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -41,14 +43,23 @@ public class StatefulPipelineService {
     private static final int MAX_TRACKED_SESSIONS = 1000;
 
     private final CompiledGraph<AgentExecutor.State> compiledGraph;
+    private final int maxContextMessages;
 
     /** Session id -> thread id of that session's most recent run. */
     private final Map<String, String> latestThreadBySession;
 
     public StatefulPipelineService(AgentGraphFactory factory, BaseCheckpointSaver checkpointSaver)
             throws GraphStateException {
+        this(factory, checkpointSaver, 20);
+    }
+
+    @Autowired
+    public StatefulPipelineService(AgentGraphFactory factory, BaseCheckpointSaver checkpointSaver,
+                                   @Value("${app.stateful.max-context-messages:20}") int maxContextMessages)
+            throws GraphStateException {
         this.compiledGraph = factory.checkpointed(checkpointSaver);
         this.latestThreadBySession = createBoundedSessionMap();
+        this.maxContextMessages = maxContextMessages;
     }
 
     private static Map<String, String> createBoundedSessionMap() {
@@ -104,10 +115,17 @@ public class StatefulPipelineService {
         if (previousThread == null) {
             return List.of();
         }
-        return compiledGraph.lastStateOf(
+        List<ChatMessage> messages = compiledGraph.lastStateOf(
                         RunnableConfig.builder().threadId(previousThread).build())
                 .map(snapshot -> snapshot.state().messages())
                 .orElse(List.of());
+        // Slide a window over the prior transcript so a long session cannot grow
+        // the seeded prompt without bound (issue #259). Keep the most recent
+        // messages (plus the new user message added by the caller).
+        if (messages.size() <= maxContextMessages) {
+            return messages;
+        }
+        return new ArrayList<>(messages.subList(messages.size() - maxContextMessages, messages.size()));
     }
 
     public List<StateEntry> getStateHistory(String sessionId) {

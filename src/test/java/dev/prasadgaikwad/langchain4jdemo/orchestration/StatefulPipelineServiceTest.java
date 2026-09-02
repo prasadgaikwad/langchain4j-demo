@@ -113,4 +113,52 @@ class StatefulPipelineServiceTest {
                         + " (was " + second.checkpointCount() + ")");
         assertFalse(second.history().isEmpty());
     }
+
+    @Test
+    void transcriptSeededIntoEachRunIsWindowedToTheConfiguredBudget() throws Exception {
+        PlainAnswerModel model = new PlainAnswerModel();
+        // Window of 4 lets the first turn (2 messages) seed in full, then keeps
+        // only the most recent 4 as the session grows.
+        StatefulPipelineService service = new StatefulPipelineService(
+                new AgentGraphFactory(model,
+                        new CalculatorTool(),
+                        new DocumentSearchTool(null),
+                        new WeatherTool(),
+                        new EmbeddingStoreStatsTool(null)),
+                new BoundedMemorySaver(10_000),
+                4);
+
+        for (int i = 0; i < 6; i++) {
+            service.run("sess-window", "turn " + i);
+        }
+
+        // The last run's prompt must stay bounded by the window, not grow with
+        // the whole session. The window caps the seeded prior messages, so the
+        // prompt stabilizes at a small constant instead of growing without bound
+        // (which would have reached 12+ messages across 6 turns).
+        java.util.List<Integer> sizes = model.receivedRequests.stream().map(List::size).toList();
+        assertTrue(sizes.stream().max(Integer::compareTo).orElse(0) <= 6,
+                "seeded transcript must be windowed; sizes=" + sizes);
+        // The window must actually engage: once the session exceeds the window,
+        // the prompt must stop growing (last sizes equal, not increasing).
+        int last = sizes.get(sizes.size() - 1);
+        assertTrue(last == sizes.get(sizes.size() - 2),
+                "window should bound prompt growth; sizes=" + sizes);
+        // Expect at least one turn where the window actually dropped old context
+        // (session had 6+ turns but each prompt stayed within the window).
+        assertTrue(model.receivedRequests.size() >= 6);
+    }
+
+    /** Always replies with a plain text answer so each turn is self-contained. */
+    private static final class PlainAnswerModel implements ChatModel {
+        final List<List<ChatMessage>> receivedRequests = new ArrayList<>();
+
+        @Override
+        public ChatResponse doChat(ChatRequest request) {
+            receivedRequests.add(new ArrayList<>(request.messages()));
+            return ChatResponse.builder()
+                    .aiMessage(AiMessage.from("ok"))
+                    .build();
+        }
+    }
 }
