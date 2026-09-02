@@ -157,6 +157,28 @@ class HumanInTheLoopServiceTest {
     }
 
     @Test
+    void rejectedSessionCannotBeResumedToExecuteUnapprovedTools() throws Exception {
+        var model = new SingleProposalModel();
+        HumanInTheLoopService service = newService(model);
+
+        var started = service.start("s3b", "what is 2 + 3?");
+        assertTrue(started.awaitingApproval());
+        int callsAtRejection = model.modelCalls;
+
+        var rejected = service.resume("s3b", false, "do not compute this");
+        assertFalse(rejected.awaitingApproval());
+
+        // Issue #265: a later start on the same session must not resume the
+        // parked graph and execute the previously-rejected tools. It should be
+        // treated as terminal — no new tool proposal.
+        var restarted = service.start("s3b", "just say hi");
+        assertFalse(restarted.awaitingApproval(),
+                "after rejection the session must be terminal, not re-propose tools");
+        assertEquals(callsAtRejection, model.modelCalls,
+                "no tool may execute after a rejection, even on a later start");
+    }
+
+    @Test
     void secondProposalAfterApprovalIsDetectedAgain() throws Exception {
         var model = new TwoRoundProposalModel();
         HumanInTheLoopService service = newService(model);
