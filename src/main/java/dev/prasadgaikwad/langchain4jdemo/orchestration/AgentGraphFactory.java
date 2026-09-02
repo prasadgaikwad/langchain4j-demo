@@ -101,9 +101,10 @@ public class AgentGraphFactory {
 
     /**
      * Streams a run, collecting the ordered step trace and the last observed
-     * state. A mid-graph failure is rethrown only when nothing was produced;
-     * otherwise a partial trace/answer is returned (matches the previous
-     * per-service behavior).
+     * state. A failure mid-run is always propagated: a partial state is not
+     * a terminal state, so returning it as success would hide the error from
+     * callers (issue #261). Interrupt-based pauses (HITL) end the stream
+     * normally, so they are unaffected.
      *
      * @param input  {@code null} means resume from the checkpoint's next node
      * @param config {@code null} for a single-shot run without a thread
@@ -113,18 +114,12 @@ public class AgentGraphFactory {
         List<String> steps = new ArrayList<>();
         S lastState = null;
         var generator = config == null ? graph.stream(input) : graph.stream(input, config);
-        try {
-            for (var item : generator) {
-                String nodeName = item.node();
-                if (!"__START__".equals(nodeName) && !"__END__".equals(nodeName)) {
-                    steps.add(nodeName);
-                }
-                lastState = item.state();
+        for (var item : generator) {
+            String nodeName = item.node();
+            if (!"__START__".equals(nodeName) && !"__END__".equals(nodeName)) {
+                steps.add(nodeName);
             }
-        } catch (RuntimeException e) {
-            if (lastState == null && steps.isEmpty()) {
-                throw e;
-            }
+            lastState = item.state();
         }
         return new GraphRun<>(List.copyOf(steps), lastState);
     }
