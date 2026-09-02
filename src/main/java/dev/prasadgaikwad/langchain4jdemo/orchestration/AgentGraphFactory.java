@@ -18,6 +18,8 @@ import org.bsc.langgraph4j.agent.Agent;
 import org.bsc.langgraph4j.agentexecutor.AgentExecutor;
 import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.state.AgentState;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -45,44 +47,57 @@ public class AgentGraphFactory {
             - Prefer answering directly over calling tools repeatedly.
             """;
 
-    private static final int MAX_ITERATIONS = 8;
+    /** Default recursion budget shared by all three graphs (issue #260). */
+    static final int DEFAULT_RECURSION_LIMIT = 16;
 
     private final ChatModel chatModel;
     private final CalculatorTool calculatorTool;
     private final DocumentSearchTool documentSearchTool;
     private final WeatherTool weatherTool;
     private final EmbeddingStoreStatsTool storeStatsTool;
+    private final int recursionLimit;
 
     public AgentGraphFactory(ChatModel chatModel,
                              CalculatorTool calculatorTool,
                              DocumentSearchTool documentSearchTool,
                              WeatherTool weatherTool,
                              EmbeddingStoreStatsTool storeStatsTool) {
+        this(chatModel, calculatorTool, documentSearchTool, weatherTool, storeStatsTool,
+                DEFAULT_RECURSION_LIMIT);
+    }
+
+    @Autowired
+    public AgentGraphFactory(ChatModel chatModel,
+                             CalculatorTool calculatorTool,
+                             DocumentSearchTool documentSearchTool,
+                             WeatherTool weatherTool,
+                             EmbeddingStoreStatsTool storeStatsTool,
+                             @Value("${app.agent.recursion-limit:16}") int recursionLimit) {
         this.chatModel = chatModel;
         this.calculatorTool = calculatorTool;
         this.documentSearchTool = documentSearchTool;
         this.weatherTool = weatherTool;
         this.storeStatsTool = storeStatsTool;
+        this.recursionLimit = recursionLimit;
     }
 
-    /** The plain ReACT graph: no checkpoints, standard recursion budget. */
+    /** The plain ReACT graph: no checkpoints, shared recursion budget. */
     public CompiledGraph<AgentExecutor.State> react() throws GraphStateException {
-        return graph(null, List.of(), MAX_ITERATIONS);
+        return graph(null, List.of());
     }
 
     /** A checkpointed graph with no pre-action interrupt (conversational stateful turns). */
     public CompiledGraph<AgentExecutor.State> checkpointed(BaseCheckpointSaver saver) throws GraphStateException {
-        return graph(saver, List.of(), MAX_ITERATIONS * 2);
+        return graph(saver, List.of());
     }
 
     /** A checkpointed graph that parks before every action for human approval. */
     public CompiledGraph<AgentExecutor.State> humanInTheLoop(BaseCheckpointSaver saver) throws GraphStateException {
-        return graph(saver, List.of(Agent.ACTION_LABEL), MAX_ITERATIONS * 2);
+        return graph(saver, List.of(Agent.ACTION_LABEL));
     }
 
     private CompiledGraph<AgentExecutor.State> graph(BaseCheckpointSaver saver,
-                                                     List<String> interruptBefore,
-                                                     int recursionLimit) throws GraphStateException {
+                                                     List<String> interruptBefore) throws GraphStateException {
         StateGraph<AgentExecutor.State> stateGraph = AgentExecutor.builder()
                 .chatModel(chatModel)
                 .systemMessage(SystemMessage.from(SYSTEM_MESSAGE))

@@ -13,6 +13,8 @@ import org.bsc.langgraph4j.state.StateSnapshot;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +42,23 @@ public class HumanInTheLoopService {
 
     private final CompiledGraph<AgentExecutor.State> compiledGraph;
 
+    /** Upper bound on the number of rejected-session ids we remember. */
+    private static final int MAX_REJECTED_SESSIONS = 1000;
+
+    /**
+     * Session ids whose pending action was rejected. Kept bounded (issue #265)
+     * so a later start/resume cannot re-execute the unapproved action; the
+     * in-memory marker is enough because these are short-lived conversations.
+     * A LinkedHashMap-as-set (keys) evicts the oldest rejected id first.
+     */
+    private final Map<String, Boolean> rejectedSessions =
+            Collections.synchronizedMap(new LinkedHashMap<>() {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
+                    return size() > MAX_REJECTED_SESSIONS;
+                }
+            });
+
     public HumanInTheLoopService(AgentGraphFactory factory, BaseCheckpointSaver checkpointSaver)
             throws GraphStateException {
         this.compiledGraph = factory.humanInTheLoop(checkpointSaver);
@@ -48,6 +67,12 @@ public class HumanInTheLoopService {
     public HitlResult start(String sessionId, String task) {
         if (sessionId == null || sessionId.isBlank()) {
             sessionId = UUID.randomUUID().toString();
+        }
+        if (rejectedSessions.containsKey(sessionId)) {
+            // The session's pending action was rejected (#265): a fresh start
+            // must not resume the parked graph and execute the unapproved tools.
+            return new HitlResult(sessionId, task, "(rejected earlier)", List.of(),
+                    false, "", "");
         }
 
         List<String> steps = new ArrayList<>();
@@ -62,12 +87,20 @@ public class HumanInTheLoopService {
      * session without touching it — unapproved tools never execute.
      */
     public HitlResult resume(String sessionId, boolean approved, String feedback) {
+        if (rejectedSessions.containsKey(sessionId)) {
+            // A rejection was already recorded (#265); never re-execute tools on
+            // this session regardless of the new approval flag.
+            return new HitlResult(sessionId, "(rejected: " + feedback + ")", "(rejected earlier)",
+                    List.of(), false, "", feedback);
+        }
         if (!approved) {
             // Resuming would execute the unapproved tools (the agent->action
-            // edge is unconditional), so rejection ends the session here.
+            // edge is unconditional), so rejection ends the session here and
+            // records it so a later start/resume cannot execute them (#265).
             String answer = compiledGraph.lastStateOf(configFor(sessionId))
                     .map(snapshot -> AgentGraphFactory.answerOf(snapshot.state()))
                     .orElse("No response");
+            rejectedSessions.put(sessionId, Boolean.TRUE);
             return new HitlResult(sessionId, "(rejected: " + feedback + ")", answer,
                     List.of(), false, "", feedback);
         }

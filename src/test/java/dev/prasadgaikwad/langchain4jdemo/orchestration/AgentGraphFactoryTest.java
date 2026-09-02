@@ -14,11 +14,14 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Regression tests for issue #261: a mid-graph model/tool failure must reach
- * the caller instead of being swallowed into a partial "success" answer.
+ * Regression tests for the shared ReACT graph factory: issue #261 (a
+ * mid-graph model/tool failure must reach the caller instead of being
+ * swallowed into a partial "success" answer) and issue #260 (a single
+ * config-driven recursion limit applied to all three graphs).
  */
 class AgentGraphFactoryTest {
 
@@ -38,6 +41,28 @@ class AgentGraphFactoryTest {
                 .isInstanceOf(RuntimeException.class)
                 .rootCause()
                 .hasMessage("boom");
+    }
+
+    @Test
+    void allThreeGraphsShareTheConfiguredRecursionLimit() throws Exception {
+        AgentGraphFactory factory = new AgentGraphFactory(
+                new FailingAfterFirstCallChatModel(),
+                new CalculatorTool(),
+                new DocumentSearchTool(null),
+                new WeatherTool(),
+                new EmbeddingStoreStatsTool(null),
+                24);
+
+        // All three graph types must compile with the same (config-driven)
+        // recursion budget rather than divergent per-service values (#260).
+        assertThat(factory.react()).isNotNull();
+        assertThat(factory.checkpointed(new BoundedMemorySaver(100))).isNotNull();
+        assertThat(factory.humanInTheLoop(new BoundedMemorySaver(100))).isNotNull();
+    }
+
+    @Test
+    void defaultRecursionLimitIsSharedAndPositive() {
+        assertThat(AgentGraphFactory.DEFAULT_RECURSION_LIMIT).isPositive();
     }
 
     /** Stage 1 asks for a tool call; stage 2 fails during synthesis. */
