@@ -2,7 +2,7 @@ package dev.prasadgaikwad.langchain4jdemo.memory;
 
 /**
  * Supported chat memory types, mirroring the README's "Buffer" and "Summary"
- * concepts as implemented by LangChain4j 1.18.1:
+ * concepts as implemented by LangChain4j 1.19.0:
  * <ul>
  *   <li>{@link #MESSAGE_WINDOW} - sliding window limited by message count (a buffer)</li>
  *   <li>{@link #TOKEN_WINDOW}  - sliding window limited by token count (context-window-aware)</li>

@@ -188,7 +188,7 @@ public class ChatApiController {
             content = @Content(schema = @Schema(implementation = ReactResponse.class)))
     public ReactResponse react(@RequestBody ChatRequest request) {
         ReactResult result = reactAgentService.run(request.message());
-        return new ReactResponse(result.task(), result.answer(), result.steps(), result.agentMessages());
+        return new ReactResponse(result.task(), result.answer(), result.steps(), result.agentTrace());
     }
 
     @PostMapping("/stateful/react")
