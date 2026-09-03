@@ -54,7 +54,7 @@ class DynamicToolProviderTest {
     private static DynamicAgent buildAgent(ChatModel model) {
         CalculatorTool calculatorTool = new CalculatorTool();
         WeatherTool weatherTool = new WeatherTool();
-        NoteTool noteTool = new NoteTool();
+        NoteTool noteTool = new NoteTool(100);
         DynamicToolProvider provider = new DynamicToolProvider(calculatorTool, weatherTool, noteTool);
         return AiServices.builder(DynamicAgent.class)
                 .chatModel(model)
