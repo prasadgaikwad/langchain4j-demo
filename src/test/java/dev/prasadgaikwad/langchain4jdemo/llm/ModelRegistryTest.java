@@ -4,6 +4,7 @@ import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.ModelProvider;
 import dev.langchain4j.model.chat.Capability;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -126,6 +127,64 @@ class ModelRegistryTest {
         registry.chat(ChatRequest.builder().messages(UserMessage.from("hello")).build());
 
         assertThat(model.lastRequest().parameters()).isInstanceOf(OpenAiChatRequestParameters.class);
+    }
+
+    /**
+     * Regression test for #270: a build performed while the provider has no API
+     * key must NOT be cached, otherwise a transient misconfiguration poisons the
+     * registry for the life of the process and the key is never re-read. Once a
+     * key is present the (now working) model should be cached.
+     */
+    @Test
+    void doesNotCacheABuildMadeWhileTheApiKeyIsMissing() {
+        KeyControlledRegistry registry = new KeyControlledRegistry(false);
+
+        registry.currentChatModel();
+        registry.currentChatModel();
+
+        assertThat(registry.buildCount()).as("no-key builds are not cached").isEqualTo(2);
+
+        registry.setApiKeyPresent(true);
+        registry.currentChatModel();
+        registry.currentChatModel();
+
+        assertThat(registry.buildCount()).as("once the key is present the model is cached").isEqualTo(3);
+    }
+
+    /**
+     * {@link ModelRegistry} whose API key availability is faked and whose model
+     * builds are counted, so the caching decision (issue #270) is observable
+     * without real env vars or network calls.
+     */
+    private static final class KeyControlledRegistry extends ModelRegistry {
+
+        private boolean apiKeyPresent;
+        private int buildCount;
+
+        KeyControlledRegistry(boolean apiKeyPresent) {
+            super("openai", "gpt-4o-mini", "claude-haiku-4-5-20251001",
+                    "gemini-2.5-flash", "llama3.2", "http://localhost:11434");
+            this.apiKeyPresent = apiKeyPresent;
+        }
+
+        void setApiKeyPresent(boolean apiKeyPresent) {
+            this.apiKeyPresent = apiKeyPresent;
+        }
+
+        int buildCount() {
+            return buildCount;
+        }
+
+        @Override
+        protected String apiKeyFor(LlmProvider provider) {
+            return provider == LlmProvider.OPENAI && apiKeyPresent ? "fake-key" : null;
+        }
+
+        @Override
+        protected ChatModel buildChatModel(LlmProvider provider, String modelName) {
+            buildCount++;
+            return new FakeChatModel("fake answer");
+        }
     }
 
     /**

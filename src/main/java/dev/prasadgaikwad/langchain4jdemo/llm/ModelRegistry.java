@@ -90,8 +90,7 @@ public class ModelRegistry implements ChatModel {
      */
     public ChatModel currentChatModel() {
         Selection s = selection;
-        return models.computeIfAbsent(key(s.provider, s.modelName),
-                ignored -> buildChatModel(s.provider, s.modelName));
+        return getOrBuild(s.provider, s.modelName);
     }
 
     public LlmProvider currentProvider() {
@@ -141,8 +140,29 @@ public class ModelRegistry implements ChatModel {
         String modelName = parts.length > 1 && !parts[1].isBlank()
                 ? parts[1].trim()
                 : configuredModelNames.get(provider);
-        return models.computeIfAbsent(key(provider, modelName),
-                ignored -> buildChatModel(provider, modelName));
+        return getOrBuild(provider, modelName);
+    }
+
+    /**
+     * Returns a cached {@code provider:model} if one exists, otherwise builds it.
+     * A build is only cached when it can actually work: for providers that need
+     * an API key, the model is built from the live key each call until a key is
+     * present, so a transiently missing/blank key is never cached (issue #270).
+     * Without this, a misconfigured first call would poison the cache for the
+     * life of the process.
+     */
+    private ChatModel getOrBuild(LlmProvider provider, String modelName) {
+        String builtKey = key(provider, modelName);
+        ChatModel cached = models.get(builtKey);
+        if (cached != null) {
+            return cached;
+        }
+        ChatModel built = buildChatModel(provider, modelName);
+        if (needsKey(provider) && !hasApiKey(provider)) {
+            return built;
+        }
+        models.putIfAbsent(builtKey, built);
+        return built;
     }
 
     /**
@@ -209,18 +229,18 @@ public class ModelRegistry implements ChatModel {
         return currentChatModel().provider();
     }
 
-    private ChatModel buildChatModel(LlmProvider provider, String modelName) {
+    protected ChatModel buildChatModel(LlmProvider provider, String modelName) {
         return switch (provider) {
             case OPENAI -> OpenAiChatModel.builder()
-                    .apiKey(System.getenv("OPENAI_API_KEY"))
+                    .apiKey(apiKeyFor(provider))
                     .modelName(modelName)
                     .build();
             case ANTHROPIC -> AnthropicChatModel.builder()
-                    .apiKey(System.getenv("ANTHROPIC_API_KEY"))
+                    .apiKey(apiKeyFor(provider))
                     .modelName(modelName)
                     .build();
             case GEMINI -> GoogleAiGeminiChatModel.builder()
-                    .apiKey(System.getenv("GOOGLE_AI_GEMINI_API_KEY"))
+                    .apiKey(apiKeyFor(provider))
                     .modelName(modelName)
                     .build();
             case OLLAMA -> OllamaChatModel.builder()
@@ -230,14 +250,27 @@ public class ModelRegistry implements ChatModel {
         };
     }
 
-    private static boolean hasApiKey(LlmProvider provider) {
-        String key = switch (provider) {
+    /**
+     * The provider's API key, read from the environment. Extracted so tests can
+     * override it to exercise the no-key, do-not-cache path (issue #270).
+     */
+    protected String apiKeyFor(LlmProvider provider) {
+        return switch (provider) {
             case OPENAI -> System.getenv("OPENAI_API_KEY");
             case ANTHROPIC -> System.getenv("ANTHROPIC_API_KEY");
             case GEMINI -> System.getenv("GOOGLE_AI_GEMINI_API_KEY");
             case OLLAMA -> null;
         };
+    }
+
+    private boolean hasApiKey(LlmProvider provider) {
+        String key = apiKeyFor(provider);
         return key != null && !key.isBlank();
+    }
+
+    /** Whether {@code provider} requires an API key (everything but local Ollama). */
+    private static boolean needsKey(LlmProvider provider) {
+        return provider != LlmProvider.OLLAMA;
     }
 
     private static String key(LlmProvider provider, String modelName) {
