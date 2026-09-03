@@ -63,6 +63,15 @@ class MetricsTest {
     }
 
     @Test
+    void rougeLExactMatchShortCircuitsToFullScore() {
+        Metric rougeL = Metrics.rougeL();
+
+        assertThat(rougeL.evaluate("q", "a b c d", "a b c d")).isEqualTo(1.0);
+        assertThat(rougeL.evaluate("q", "a b c d", "a b c d e f")).isLessThan(1.0);
+        assertThat(rougeL.evaluate("q", "hello world", "goodbye there")).isEqualTo(0.0);
+    }
+
+    @Test
     void judgeScoreParsesTheRatingAndNormalizes() {
         assertThat(Metrics.judgeScore(new FakeChatModel("4")).evaluate("q", "expected", "actual")).isEqualTo(0.8);
         assertThat(Metrics.judgeScore(new FakeChatModel("5")).evaluate("q", "expected", "actual")).isEqualTo(1.0);

@@ -223,6 +223,9 @@ public final class Metrics {
     }
 
     private static int lcsLength(List<String> a, List<String> b) {
+        if (a.equals(b)) {
+            return a.size();
+        }
         int[][] dp = new int[a.size() + 1][b.size() + 1];
         for (int i = 1; i <= a.size(); i++) {
             for (int j = 1; j <= b.size(); j++) {
