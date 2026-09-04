@@ -284,8 +284,8 @@ class ChatApiControllerTest {
                 .andExpect(jsonPath("$.answer").value("The answer is 4."))
                 .andExpect(jsonPath("$.steps").isArray())
                 .andExpect(jsonPath("$.steps.length()").value(3))
-                .andExpect(jsonPath("$.agentMessages").isArray())
-                .andExpect(jsonPath("$.agentMessages.length()").value(3));
+                .andExpect(jsonPath("$.agentTrace").isArray())
+                .andExpect(jsonPath("$.agentTrace.length()").value(3));
     }
 
     @Test
