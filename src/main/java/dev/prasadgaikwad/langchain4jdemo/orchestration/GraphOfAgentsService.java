@@ -22,13 +22,13 @@ public class GraphOfAgentsService {
         TopicSuggestionAgent topicSuggestion = AgenticServices.agentBuilder(TopicSuggestionAgent.class)
                 .chatModel(chatModel).build();
 
-        TopicOutlineAgent outline = AgenticServices.agentBuilder(TopicOutlineAgent.class)
+        OutlineAgent outline = AgenticServices.agentBuilder(OutlineAgent.class)
                 .chatModel(chatModel).build();
 
         TopicDraftAgent draft = AgenticServices.agentBuilder(TopicDraftAgent.class)
                 .chatModel(chatModel).build();
 
-        TopicEditorAgent editor = AgenticServices.agentBuilder(TopicEditorAgent.class)
+        EditorAgent editor = AgenticServices.agentBuilder(EditorAgent.class)
                 .chatModel(chatModel).build();
 
         TopicWriteupAgent writeup = AgenticServices.agentBuilder(TopicWriteupAgent.class)
