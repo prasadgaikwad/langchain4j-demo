@@ -11,6 +11,7 @@ import dev.prasadgaikwad.langchain4jdemo.agent.CalculatorTool;
 import dev.prasadgaikwad.langchain4jdemo.agent.DocumentSearchTool;
 import dev.prasadgaikwad.langchain4jdemo.agent.WeatherTool;
 import dev.prasadgaikwad.langchain4jdemo.memory.ChatMemoryRegistry;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -29,6 +30,8 @@ public class CrewService {
     private final SupervisorAgent supervisor;
 
     public CrewService(ChatModel chatModel,
+                       @Value("${app.crew.max-memory-messages:10}") int maxMessages,
+                       @Value("${app.crew.max-agents-invocations:10}") int maxAgentsInvocations,
                        ChatMemoryRegistry chatMemoryRegistry,
                        CalculatorTool calculatorTool,
                        WeatherTool weatherTool,
@@ -36,7 +39,7 @@ public class CrewService {
         ChatMemoryProvider memoryProvider = memoryId -> {
             ChatMemory memory = MessageWindowChatMemory.builder()
                     .id((String) memoryId)
-                    .maxMessages(10)
+                    .maxMessages(maxMessages)
                     .build();
             chatMemoryRegistry.register((String) memoryId, memory);
             return memory;
@@ -64,7 +67,7 @@ public class CrewService {
                 .chatMemoryProvider(memoryProvider)
                 .subAgents(calculatorAgent, weatherAgent, researchAgent)
                 .responseStrategy(SupervisorResponseStrategy.LAST)
-                .maxAgentsInvocations(10)
+                .maxAgentsInvocations(maxAgentsInvocations)
                 .build();
     }
 

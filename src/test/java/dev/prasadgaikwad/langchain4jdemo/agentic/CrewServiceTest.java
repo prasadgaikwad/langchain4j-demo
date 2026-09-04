@@ -28,6 +28,8 @@ class CrewServiceTest {
                 modelName -> new FakeEmbeddingModel(), new DocumentService("recursive", 200, 20), "test", null, 5);
         return new CrewService(
                 chatModel,
+                10,
+                10,
                 new ChatMemoryRegistry(),
                 new CalculatorTool(),
                 new WeatherTool(),
