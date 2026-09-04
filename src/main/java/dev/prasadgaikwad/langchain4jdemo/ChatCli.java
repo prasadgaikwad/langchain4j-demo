@@ -17,7 +17,6 @@ import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.HumanInTheLoopService;
-import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.AnswerProvider;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.EvaluationReport;
@@ -743,10 +742,10 @@ public class ChatCli implements CommandLineRunner {
             return;
         }
 
-        String providerPart = spec.split(":")[0].toLowerCase(Locale.ROOT);
-        if (providerPart.equals("openai") || providerPart.equals("anthropic")
-                || providerPart.equals("gemini") || providerPart.equals("ollama")) {
-            switchChatModel(spec);
+        // The distinction between a chat-model spec and an embedding-model name
+        // is decided by ModelRegistry.setModel itself (it rejects non-providers),
+        // so we don't re-list provider names here (issue #258, C5).
+        if (switchChatModel(spec)) {
             return;
         }
 
@@ -755,17 +754,20 @@ public class ChatCli implements CommandLineRunner {
                 + "'. Re-index documents to embed them with the new model.");
     }
 
-    private void switchChatModel(String spec) {
+    /** @return {@code true} if the spec was a valid chat-model switch. */
+    private boolean switchChatModel(String spec) {
         try {
             modelRegistry.setModel(spec);
             System.out.println("Switched chat model to '" + modelRegistry.currentLabel()
                     + "'. Every AI service now uses this model.");
+            return true;
         } catch (IllegalArgumentException e) {
             System.out.println(e.getMessage());
             System.out.println("Usage: /model chat <provider[:model]> where provider is one of:");
             for (String entry : modelRegistry.modelList().keySet()) {
                 System.out.println("  " + entry + "  (" + modelRegistry.modelList().get(entry) + ")");
             }
+            return false;
         }
     }
 

@@ -202,7 +202,7 @@ public class ChatApiController {
         StatefulPipelineService.StatefulResult result = statefulPipelineService.run(
                 request.conversationId(), request.message());
         List<StatefulReactResponse.StateEntry> historyEntries = result.history().stream()
-                .map(h -> new StatefulReactResponse.StateEntry(h.sessionId(), h.node(), h.lastAiMessage(), h.messageCount()))
+                .map(h -> new StatefulReactResponse.StateEntry(h.threadId(), h.node(), h.lastAiMessage(), h.messageCount()))
                 .toList();
         return new StatefulReactResponse(
                 result.sessionId(),

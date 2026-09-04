@@ -19,15 +19,4 @@ class ImageGenerationServiceTest {
         assertThat(imageModel.lastPrompt()).isEqualTo("a robot painting a sunset");
         assertThat(imageModel.lastCount()).isEqualTo(1);
     }
-
-    @Test
-    void generateWithCountRequestsMultipleAndReturnsFirst() {
-        FakeImageModel imageModel = new FakeImageModel();
-        ImageGenerationService service = new ImageGenerationService(imageModel);
-
-        Image image = service.generate("a fox in a forest", 3);
-
-        assertThat(image.url()).isNotNull();
-        assertThat(imageModel.lastCount()).isEqualTo(3);
-    }
 }

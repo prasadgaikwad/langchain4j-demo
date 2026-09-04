@@ -26,11 +26,4 @@ public class ImageGenerationService {
     public Image generate(String prompt) {
         return imageModel.generate(prompt).content();
     }
-
-    /**
-     * Generates {@code n} images for the prompt and returns the first one.
-     */
-    public Image generate(String prompt, int n) {
-        return imageModel.generate(prompt, n).content().get(0);
-    }
 }
