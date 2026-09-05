@@ -28,7 +28,7 @@ public class ChatStreamingService {
     public void stream(String message, StreamConsumer consumer) {
         streamingChatModel.chat(ChatRequest.builder()
                 .messages(List.of(
-                        SystemMessage.from("You are a helpful assistant. Answer concisely, in a few sentences."),
+                        SystemMessage.from("You are a helpful assistant. Answer the question in a very concise way, only in 2 sentences maximum."),
                         UserMessage.from(message)))
                 .build(), new StreamingChatResponseHandler() {
 

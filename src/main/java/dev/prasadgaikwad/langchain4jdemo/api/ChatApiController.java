@@ -24,6 +24,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,6 +59,7 @@ public class ChatApiController {
     private final ReactAgentService reactAgentService;
     private final StatefulPipelineService statefulPipelineService;
     private final HumanInTheLoopService humanInTheLoopService;
+    private final long sseTimeoutMs;
 
     public ChatApiController(Assistant assistant,
                              QaService qaService,
@@ -70,7 +72,8 @@ public class ChatApiController {
                              WorkflowOfAgentsService workflowOfAgentsService,
                              ReactAgentService reactAgentService,
                              StatefulPipelineService statefulPipelineService,
-                             HumanInTheLoopService humanInTheLoopService) {
+                             HumanInTheLoopService humanInTheLoopService,
+                             @Value("${app.chat.sse-timeout-ms:60000}") long sseTimeoutMs) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chainService = chainService;
@@ -83,6 +86,7 @@ public class ChatApiController {
         this.reactAgentService = reactAgentService;
         this.statefulPipelineService = statefulPipelineService;
         this.humanInTheLoopService = humanInTheLoopService;
+        this.sseTimeoutMs = sseTimeoutMs;
     }
 
     @PostMapping("/chat")
@@ -259,7 +263,7 @@ public class ChatApiController {
                              @RequestParam String message,
             @Parameter(description = "Conversation (memory) id", example = "web")
             @RequestParam(defaultValue = "api") String conversationId) {
-        SseEmitter emitter = new SseEmitter(60_000L);
+        SseEmitter emitter = new SseEmitter(sseTimeoutMs);
         List<String> tokens = new ArrayList<>();
         streamingService.stream(message, new ChatStreamingService.StreamConsumer() {
             @Override
