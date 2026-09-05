@@ -257,8 +257,7 @@ public class ChatApiController {
     @ApiResponse(responseCode = "200", description = "A stream of JSON-encoded tokens")
     public SseEmitter stream(@Parameter(description = "The user message to stream", example = "Tell me a short joke")
                              @RequestParam String message,
-            @Parameter(description = "Conversation (memory) id", example = "web",
-                    schema = @Schema(defaultValue = "api"))
+            @Parameter(description = "Conversation (memory) id", example = "web")
             @RequestParam(defaultValue = "api") String conversationId) {
         SseEmitter emitter = new SseEmitter(60_000L);
         List<String> tokens = new ArrayList<>();
