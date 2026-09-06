@@ -30,7 +30,7 @@ class CrewServiceTest {
                 chatModel,
                 10,
                 10,
-                new ChatMemoryRegistry(),
+                new ChatMemoryRegistry(100),
                 new CalculatorTool(),
                 new WeatherTool(),
                 new DocumentSearchTool(searchService));
