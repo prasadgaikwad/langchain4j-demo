@@ -24,6 +24,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,6 +59,7 @@ public class ChatApiController {
     private final ReactAgentService reactAgentService;
     private final StatefulPipelineService statefulPipelineService;
     private final HumanInTheLoopService humanInTheLoopService;
+    private final long sseTimeoutMs;
 
     public ChatApiController(Assistant assistant,
                              QaService qaService,
@@ -70,7 +72,8 @@ public class ChatApiController {
                              WorkflowOfAgentsService workflowOfAgentsService,
                              ReactAgentService reactAgentService,
                              StatefulPipelineService statefulPipelineService,
-                             HumanInTheLoopService humanInTheLoopService) {
+                             HumanInTheLoopService humanInTheLoopService,
+                             @Value("${app.chat.sse-timeout-ms:60000}") long sseTimeoutMs) {
         this.assistant = assistant;
         this.qaService = qaService;
         this.chainService = chainService;
@@ -83,6 +86,7 @@ public class ChatApiController {
         this.reactAgentService = reactAgentService;
         this.statefulPipelineService = statefulPipelineService;
         this.humanInTheLoopService = humanInTheLoopService;
+        this.sseTimeoutMs = sseTimeoutMs;
     }
 
     @PostMapping("/chat")
@@ -188,7 +192,7 @@ public class ChatApiController {
             content = @Content(schema = @Schema(implementation = ReactResponse.class)))
     public ReactResponse react(@RequestBody ChatRequest request) {
         ReactResult result = reactAgentService.run(request.message());
-        return new ReactResponse(result.task(), result.answer(), result.steps(), result.agentMessages());
+        return new ReactResponse(result.task(), result.answer(), result.steps(), result.agentTrace());
     }
 
     @PostMapping("/stateful/react")
@@ -202,7 +206,7 @@ public class ChatApiController {
         StatefulPipelineService.StatefulResult result = statefulPipelineService.run(
                 request.conversationId(), request.message());
         List<StatefulReactResponse.StateEntry> historyEntries = result.history().stream()
-                .map(h -> new StatefulReactResponse.StateEntry(h.sessionId(), h.node(), h.lastAiMessage(), h.messageCount()))
+                .map(h -> new StatefulReactResponse.StateEntry(h.threadId(), h.node(), h.lastAiMessage(), h.messageCount()))
                 .toList();
         return new StatefulReactResponse(
                 result.sessionId(),
@@ -257,10 +261,9 @@ public class ChatApiController {
     @ApiResponse(responseCode = "200", description = "A stream of JSON-encoded tokens")
     public SseEmitter stream(@Parameter(description = "The user message to stream", example = "Tell me a short joke")
                              @RequestParam String message,
-            @Parameter(description = "Conversation (memory) id", example = "web",
-                    schema = @Schema(defaultValue = "api"))
+            @Parameter(description = "Conversation (memory) id", example = "web")
             @RequestParam(defaultValue = "api") String conversationId) {
-        SseEmitter emitter = new SseEmitter(60_000L);
+        SseEmitter emitter = new SseEmitter(sseTimeoutMs);
         List<String> tokens = new ArrayList<>();
         streamingService.stream(message, new ChatStreamingService.StreamConsumer() {
             @Override

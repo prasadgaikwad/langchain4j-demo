@@ -47,6 +47,6 @@ public class ReactAgentService {
             String task,
             String answer,
             List<String> steps,
-            List<String> agentMessages
+            List<String> agentTrace
     ) {}
 }

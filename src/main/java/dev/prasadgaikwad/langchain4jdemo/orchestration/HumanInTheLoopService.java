@@ -24,7 +24,8 @@ import java.util.UUID;
  * Human-in-the-loop ReACT agent. The graph is compiled with
  * {@code interruptBefore("action")}, so every agent turn parks before the
  * action node — but that alone is NOT an approval gate: the agent→action edge
- * is unconditional, so tool-free runs park there too (issue #247).
+ * is unconditional, so tool-free runs park there too
+ * (<a href="https://github.com/prasadgaikwad/langchain4j-demo/issues/247">#247</a>).
  *
  * <p>A genuine approval gate requires the parked state AND a pending tool
  * proposal (last AI message carrying {@code ToolExecutionRequest}s). Tool-free
@@ -34,8 +35,9 @@ import java.util.UUID;
  * unapproved tools can never execute.</p>
  *
  * <p>The graph and stream/answer helpers are provided by {@link
- * AgentGraphFactory} (issue T1); checkpoint memory is bounded via the shared
- * {@link BoundedMemorySaver} (issue #252).</p>
+ * AgentGraphFactory} (<a href="https://github.com/prasadgaikwad/langchain4j-demo/issues/257">#257</a>);
+ * checkpoint memory is bounded via the shared {@link BoundedMemorySaver}
+ * (<a href="https://github.com/prasadgaikwad/langchain4j-demo/issues/252">#252</a>).</p>
  */
 @Service
 public class HumanInTheLoopService {

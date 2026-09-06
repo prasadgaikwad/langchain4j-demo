@@ -25,7 +25,7 @@ LangChain4j is a Java framework that simplifies the development of applications 
 
 Everything this demo taught us about LangChain4j — concepts, code snippets,
 diagrams, and gotchas — is documented topic-by-topic in
-[`docs/learnings/`](docs/learnings/README.md) (34 guides across app
+[`docs/learnings/`](docs/learnings/README.md) (40 guides across app
 architecture, AI services, prompts, structured output, memory, documents,
 RAG, tools, agents, streaming, the web layer, multimodal, evaluation, model
 comparison, offline testing, chain-of-agents prompt chaining, and
@@ -73,7 +73,7 @@ graph-of-agents GOAP).
   - Structured output at the model level: JSON schema response format constrains the reply to a record's schema
 - LLM integration:
   - Multiple providers behind one interface: OpenAI, Anthropic, Google Gemini, and local models via Ollama
-  - A `ModelRegistry` (a `ChatModel` bean) delegates every AI service to the selected `provider:model`, switchable at runtime with `/model chat <provider[:model]>`
+  - A `ModelRegistry` (a `ChatModel` bean) delegates every AI service to the selected `provider:model`, switchable at runtime with `/model chat <provider[:model]>`. (The REST streaming endpoint is an exception: its `StreamingChatModel` bean is hardcoded to OpenAI, so `/api/chat/stream` stays on the configured OpenAI model regardless of the switch.)
   - Cross-model evaluation: `/eval compare [rag|chat|sentiment]` runs a golden dataset against every available model and prints a per-model averages table
 - Advanced orchestration (LangChain4j `agentic` module):
   - A `CrewService`: a supervisor agent delegates tasks to typed `CrewTaskAgent` sub-agents (calculator, weather, document research), each bound to an existing `@Tool`; the delegated request is passed to the worker as its `task` argument, and the whole crew shares the switchable `ModelRegistry`

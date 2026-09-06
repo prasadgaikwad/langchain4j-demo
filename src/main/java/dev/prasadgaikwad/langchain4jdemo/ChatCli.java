@@ -17,7 +17,6 @@ import dev.prasadgaikwad.langchain4jdemo.orchestration.WorkflowOfAgentsService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.ReactAgentService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.StatefulPipelineService;
 import dev.prasadgaikwad.langchain4jdemo.orchestration.HumanInTheLoopService;
-import dev.prasadgaikwad.langchain4jdemo.document.DocumentSplitterType;
 import dev.prasadgaikwad.langchain4jdemo.embedding.SemanticSearchService;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.AnswerProvider;
 import dev.prasadgaikwad.langchain4jdemo.evaluation.EvaluationReport;
@@ -51,6 +50,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.NoSuchElementException;
 import java.util.Scanner;
 import java.util.function.Function;
 
@@ -167,14 +167,26 @@ public class ChatCli implements CommandLineRunner {
      */
     @Override
     public void run(String... args) {
+        // In a container or other non-interactive launch there is no console to
+        // read from; an eager Scanner.next... on System.in would block forever or
+        // throw NoSuchElementException and abort the runner. When stdin is absent
+        // we exit quietly instead of blocking the main thread (issue #268).
+        if (System.console() == null) {
+            System.out.println("No interactive console; skipping CLI.");
+            return;
+        }
         printHelp();
 
         try (Scanner replScanner = this.scanner = new Scanner(System.in)) {
             while (true) {
                 System.out.print("You > ");
-                String input = replScanner.nextLine().trim();
+                String input = nextLine(replScanner);
+                if (input == null) {
+                    System.out.println("\n(no more input) Goodbye!");
+                    break;
+                }
 
-                if (input.isEmpty()) {
+                if (input.isBlank()) {
                     continue;
                 }
 
@@ -184,18 +196,27 @@ public class ChatCli implements CommandLineRunner {
                 }
 
                 if (input.startsWith("/")) {
-                    handleCommand(input);
+                    handleCommand(input.trim());
                     continue;
                 }
 
                 String memoryId = currentMemoryType.memoryId(CONVERSATION_ID);
-                String answer = assistant.chat(memoryId, input);
-                historyService.record(memoryId, "user", input);
+                String answer = assistant.chat(memoryId, input.trim());
+                historyService.record(memoryId, "user", input.trim());
                 historyService.record(memoryId, "ai", answer);
                 System.out.println("AI  > " + answer);
                 System.out.println();
             }
         }
+    }
+
+    /**
+     * Reads the next line of REPL input without throwing
+     * {@link NoSuchElementException} when stdin is closed or exhausted, so an
+     * EOF/pipe ends the loop cleanly instead of aborting the runner.
+     */
+    private String nextLine(Scanner scanner) {
+        return scanner.hasNextLine() ? scanner.nextLine() : null;
     }
 
     private void handleCommand(String input) {
@@ -721,10 +742,10 @@ public class ChatCli implements CommandLineRunner {
             return;
         }
 
-        String providerPart = spec.split(":")[0].toLowerCase(Locale.ROOT);
-        if (providerPart.equals("openai") || providerPart.equals("anthropic")
-                || providerPart.equals("gemini") || providerPart.equals("ollama")) {
-            switchChatModel(spec);
+        // The distinction between a chat-model spec and an embedding-model name
+        // is decided by ModelRegistry.setModel itself (it rejects non-providers),
+        // so we don't re-list provider names here (issue #258, C5).
+        if (switchChatModel(spec)) {
             return;
         }
 
@@ -733,17 +754,20 @@ public class ChatCli implements CommandLineRunner {
                 + "'. Re-index documents to embed them with the new model.");
     }
 
-    private void switchChatModel(String spec) {
+    /** @return {@code true} if the spec was a valid chat-model switch. */
+    private boolean switchChatModel(String spec) {
         try {
             modelRegistry.setModel(spec);
             System.out.println("Switched chat model to '" + modelRegistry.currentLabel()
                     + "'. Every AI service now uses this model.");
+            return true;
         } catch (IllegalArgumentException e) {
             System.out.println(e.getMessage());
             System.out.println("Usage: /model chat <provider[:model]> where provider is one of:");
             for (String entry : modelRegistry.modelList().keySet()) {
                 System.out.println("  " + entry + "  (" + modelRegistry.modelList().get(entry) + ")");
             }
+            return false;
         }
     }
 

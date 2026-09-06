@@ -128,9 +128,9 @@ public class StatefulPipelineService {
         return new ArrayList<>(messages.subList(messages.size() - maxContextMessages, messages.size()));
     }
 
-    public List<StateEntry> getStateHistory(String sessionId) {
+    public List<StateEntry> getStateHistory(String threadId) {
         RunnableConfig config = RunnableConfig.builder()
-                .threadId(sessionId)
+                .threadId(threadId)
                 .build();
 
         Collection<StateSnapshot<AgentExecutor.State>> snapshots =
@@ -145,7 +145,7 @@ public class StatefulPipelineService {
                     .reduce((first, second) -> second)
                     .orElse("");
             entries.add(new StateEntry(
-                    snapshot.config().threadId().orElse(sessionId),
+                    snapshot.config().threadId().orElse(threadId),
                     snapshot.node(),
                     lastMessage,
                     state.messages().size()));
@@ -163,7 +163,7 @@ public class StatefulPipelineService {
     ) {}
 
     public record StateEntry(
-            String sessionId,
+            String threadId,
             String node,
             String lastAiMessage,
             int messageCount
