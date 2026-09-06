@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.net.URI;
 import java.util.Base64;
 
 /**
@@ -42,12 +44,33 @@ public class VisionApiController {
                 : request.question();
 
         if (request.imageUrl() != null && !request.imageUrl().isBlank()) {
+            parseImageUrl(request.imageUrl());
             return ResponseEntity.ok(new DescribeResponse(visionService.describeImage(request.imageUrl(), question)));
         }
         if (request.imageData() != null && request.mimeType() != null && !request.imageData().isBlank()) {
-            byte[] bytes = Base64.getDecoder().decode(request.imageData());
+            byte[] bytes = decodeImageData(request.imageData());
             return ResponseEntity.ok(new DescribeResponse(visionService.describeImage(bytes, request.mimeType(), question)));
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+    }
+
+    private static void parseImageUrl(String imageUrl) {
+        URI uri;
+        try {
+            uri = URI.create(imageUrl);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid imageUrl: " + imageUrl);
+        }
+        if (!uri.isAbsolute()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "imageUrl must be an absolute URL: " + imageUrl);
+        }
+    }
+
+    private static byte[] decodeImageData(String imageData) {
+        try {
+            return Base64.getDecoder().decode(imageData);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "imageData is not valid base64");
+        }
     }
 }

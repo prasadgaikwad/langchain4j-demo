@@ -44,4 +44,30 @@ class VisionApiControllerTest {
                         .content("{\"question\":\"What is this?\"}"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void describeWithMalformedBase64ReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/describe")
+                        .contentType("application/json")
+                        .content("""
+                                {"imageData":"not-base64-data!!","mimeType":"image/png","question":"What is this?"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void describeWithMalformedImageUrlReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/describe")
+                        .contentType("application/json")
+                        .content("{\"imageUrl\":\"ht tp://bad url\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void describeWithRelativeImageUrlReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/describe")
+                        .contentType("application/json")
+                        .content("{\"imageUrl\":\"example.com/cat.png\"}"))
+                .andExpect(status().isBadRequest());
+    }
 }
